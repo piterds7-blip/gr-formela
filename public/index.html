@@ -11,7 +11,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{
@@ -185,16 +184,15 @@ tbody tr:hover{background:#F7FAF6;cursor:pointer}
 
 <script>
 /* ================== KONFIGURACJA FIREBASE ==================
-   Wklej tutaj konfigurację NOWEGO projektu Firebase (nie Stuchowo).
-   Dopóki apiKey zaczyna się od "WKLEJ", aplikacja działa w trybie
-   lokalnym: dane zapisują się tylko w tej przeglądarce.            */
+   Projekt Firebase: gr-formela-po-app. Gdy apiKey zaczyna się od
+   "WKLEJ", aplikacja działa w trybie lokalnym (dane tylko w przeglądarce). */
 const firebaseConfig={
-  apiKey:"WKLEJ_API_KEY",
-  authDomain:"WKLEJ.firebaseapp.com",
-  projectId:"WKLEJ",
-  storageBucket:"WKLEJ.firebasestorage.app",
-  messagingSenderId:"",
-  appId:""
+  apiKey:"AIzaSyAc-bIk_42l-U-xJBWZ6wGKbu18zeum1KE",
+  authDomain:"gr-formela-po-app.firebaseapp.com",
+  projectId:"gr-formela-po-app",
+  storageBucket:"gr-formela-po-app.firebasestorage.app",
+  messagingSenderId:"845150973868",
+  appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
 const APP_VER='0.2.0';
@@ -411,26 +409,13 @@ async function boot(){
   firebase.initializeApp(firebaseConfig);
   db=firebase.firestore();
   try{await db.enablePersistence({synchronizeTabs:true})}catch(e){}
-  firebase.auth().onAuthStateChanged(async u=>{
-    if(!u){showLogin();return}
-    $('#userBox').innerHTML=`${esc(u.email)} <button class="btn sm" id="outBtn" style="color:#fff;background:transparent;border-color:#4E7355">Wyloguj</button>`;
-    $('#outBtn').onclick=()=>firebase.auth().signOut();
-    try{await afterLogin()}catch(e){
-      console.error(e);
-      $('#main').innerHTML=`<div class="card login"><h2>Brak dostępu</h2><p>Konto ${esc(u.email)} nie ma uprawnień do bazy. Dodaj ten adres w regułach Firestore (plik firestore.rules).</p></div>`;
-    }
-  });
-}
-function showLogin(){
-  $('#tabs').classList.add('hidden');$('#userBox').innerHTML='';
-  $('#main').innerHTML=`<div class="card login"><img src="icon-192.png" alt="" width="96" height="96" style="border-radius:20px"><h2>GR Formela</h2><p class="muted">Zaloguj się kontem Google, które ma dostęp do danych gospodarstw.</p><button class="btn pri" id="loginBtn">Zaloguj przez Google</button></div>`;
-  $('#loginBtn').onclick=async()=>{
-    const p=new firebase.auth.GoogleAuthProvider();
-    try{await firebase.auth().signInWithPopup(p)}catch(e){try{await firebase.auth().signInWithRedirect(p)}catch(e2){toast('Logowanie nieudane: '+e2.message,5000)}}
-  };
+  $('#tabs').classList.remove('hidden');
+  try{await afterLogin()}catch(e){
+    console.error(e);
+    $('#main').innerHTML=`<div class="card login"><h2>Brak połączenia z bazą</h2><p class="muted">Sprawdź internet oraz reguły Firestore (plik firestore.rules). Szczegóły: ${esc(e.code||e.message)}</p><button class="btn pri" onclick="location.reload()">Spróbuj ponownie</button></div>`;
+  }
 }
 async function afterLogin(){
-  $('#tabs').classList.remove('hidden');
   S.farmId=FARM.id;
   $('#main').innerHTML='<div class="card muted">Wczytywanie danych gospodarstwa…</div>';
   let f=await Store.loadFarm(FARM.id);

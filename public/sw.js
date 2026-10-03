@@ -1,10 +1,9 @@
-const CACHE_NAME='grformela-v2';
+const CACHE_NAME='grformela-v5';
 const ASSETS=['./index.html','./manifest.json','./icon-192.png','./icon-512.png','./icon-512-maskable.png','./apple-touch-icon.png','./favicon-32.png'];
 const CDN=[
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
-  'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js'
 ];
 self.addEventListener('install',e=>{
@@ -13,7 +12,7 @@ self.addEventListener('install',e=>{
   self.skipWaiting();
 });
 self.addEventListener('activate',e=>{
-  e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE_NAME).map(x=>caches.delete(x)))));
+  e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x.startsWith('grformela-')&&x!==CACHE_NAME).map(x=>caches.delete(x)))));
   self.clients.claim();
 });
 self.addEventListener('fetch',e=>{
