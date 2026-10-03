@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Wpisz adresy e-mail kont Google, które mają dostęp do danych.
+    function dozwolony() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          'TWOJ.EMAIL@gmail.com'
+        ];
+    }
+    match /farms/{farmId} {
+      allow read, write: if dozwolony();
+      match /{kolekcja}/{doc} {
+        allow read, write: if dozwolony();
+      }
+    }
+  }
+}

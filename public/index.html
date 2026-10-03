@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2F6B3A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>GR Formela</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --c-pri:#2F6B3A;--c-pri-d:#1E4A27;--c-pri-l:#E8F0E9;--c-bg:#F6F7F2;--c-card:#fff;
+  --c-gold:#B08A12;--c-gold-bg:#FFF8E1;--c-red:#B3392C;--c-red-bg:#FDECEA;
+  --c-blue:#3F6385;--c-blue-bg:#E7EEF5;--c-grey:#8A948B;--c-grey-bg:#EEF0EC;
+  --c-txt:#1A2E1D;--c-txt2:#5A6B5C;--c-brd:#D4DDD5;--c-nav:#243E29;
+  --radius:8px;--font:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
+  --g1:#2F6B3A;--g1-bg:#E8F0E9;--g2:#B08A12;--g2-bg:#FFF8E1;--zas:#3F6385;--zas-bg:#E7EEF5;--brak:#8A948B;--brak-bg:#EEF0EC;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--font);background:var(--c-bg);color:var(--c-txt);font-size:15px;line-height:1.45;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid #7FB08A;outline-offset:2px}
+.hidden{display:none!important}
+
+/* header */
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--c-nav);color:#fff;
+  display:flex;align-items:center;gap:12px;padding:10px 16px}
+.brand{font-weight:700;font-size:18px;letter-spacing:.2px;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.brand img{width:30px;height:30px;border-radius:7px}
+.brand small{font-weight:400;opacity:.7;margin-left:6px;font-size:13px}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px}
+.mode{padding:3px 8px;border-radius:12px;background:#4E7355;white-space:nowrap}
+.mode.local{background:#8A6D12}
+
+nav.tabs{display:flex;gap:2px;background:var(--c-card);border-bottom:1px solid var(--c-brd);padding:0 12px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 52px);z-index:25}
+nav.tabs button{border:0;background:none;padding:12px 16px;color:var(--c-txt2);border-bottom:3px solid transparent;font-weight:600}
+nav.tabs button.on{color:var(--c-pri);border-bottom-color:var(--c-pri)}
+main{max-width:1400px;margin:0 auto;padding:16px}
+
+.card{background:var(--c-card);border:1px solid var(--c-brd);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+h2{font-size:20px;margin:0 0 4px}
+h3{font-size:16px;margin:0 0 10px}
+.muted{color:var(--c-txt2);font-size:13px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+.btn{border:1px solid var(--c-brd);background:#fff;border-radius:6px;padding:8px 14px;font-weight:600}
+.btn:hover{background:var(--c-pri-l)}
+.btn.pri{background:var(--c-pri);border-color:var(--c-pri);color:#fff}
+.btn.pri:hover{background:var(--c-pri-d)}
+.btn.sm{padding:4px 10px;font-size:13px}
+.btn.danger{color:var(--c-red);border-color:#E6B8B2}
+.btn:disabled{opacity:.45;cursor:default}
+input[type=text],input[type=number],input[type=date],input[type=search],select,textarea{border:1px solid var(--c-brd);border-radius:6px;padding:8px 10px;background:#fff;min-width:0}
+input[type=search]{width:220px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--c-txt2)}
+label.f input,label.f select{color:var(--c-txt);font-size:15px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+
+/* group chips */
+.gchip{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;white-space:nowrap}
+.g-g1{background:var(--g1-bg);color:var(--g1)}.g-g2{background:var(--g2-bg);color:var(--g2)}
+.g-zas{background:var(--zas-bg);color:var(--zas)}.g-brak{background:var(--brak-bg);color:#5d665e}
+
+/* suggestions */
+.sug-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sug-count{font-size:28px;font-weight:800;color:var(--c-gold);line-height:1}
+.sug-list{margin-top:12px;border-top:1px solid var(--c-brd)}
+.sug{display:grid;grid-template-columns:28px 64px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #EDF1ED}
+.sug .nr{font-weight:800;font-size:18px}
+.sug .why{font-size:13px;color:var(--c-txt2)}
+.sug .acts{display:flex;gap:6px}
+.arrow{font-weight:700}
+
+/* board */
+.board-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.coltabs{display:none;gap:6px;overflow-x:auto;margin-bottom:10px}
+.coltabs button{border:1px solid var(--c-brd);background:#fff;border-radius:18px;padding:6px 12px;font-weight:600;white-space:nowrap}
+.coltabs button.on{background:var(--c-txt);color:#fff;border-color:var(--c-txt)}
+.board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start}
+.col{background:#EEF1EC;border-radius:var(--radius);padding:8px;min-height:200px;border-top:5px solid var(--brak)}
+.col[data-g=g1]{border-top-color:var(--g1)}.col[data-g=g2]{border-top-color:var(--g2)}.col[data-g=zas]{border-top-color:var(--zas)}
+.col.drop{outline:3px dashed var(--c-pri);outline-offset:-3px;background:var(--c-pri-l)}
+.col-h{display:flex;align-items:baseline;gap:8px;padding:4px 4px 8px}
+.col-h b{font-size:15px}.col-h .n{font-size:22px;font-weight:800;margin-left:auto}
+.col-h .sel-all{font-size:12px;border:0;background:none;color:var(--c-txt2);text-decoration:underline;padding:0}
+.cow{background:#fff;border:1px solid var(--c-brd);border-radius:6px;padding:7px 9px;margin-bottom:6px;display:grid;grid-template-columns:auto 1fr auto;gap:2px 8px;align-items:center;user-select:none}
+.cow[draggable=true]{cursor:grab}
+.cow .nr{font-size:19px;font-weight:800;min-width:34px}
+.cow .nm{font-size:13px;color:var(--c-txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cow .dim{font-size:13px;font-weight:700;text-align:right;white-space:nowrap}
+.cow .meta{grid-column:2/4;font-size:12px;color:var(--c-txt2);display:flex;gap:8px;flex-wrap:wrap}
+.cow.over .dim{color:var(--c-red)}
+.cow .hint{color:var(--c-gold);font-weight:700}
+.cow.sel{border-color:var(--c-pri);box-shadow:0 0 0 2px var(--c-pri) inset;background:var(--c-pri-l)}
+.cow.gone{opacity:.5}
+.pin{font-size:12px}
+.selbar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--c-nav);color:#fff;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px}
+.selbar .sb-top{display:flex;align-items:center;gap:8px}
+.selbar .sb-btns{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;max-width:760px}
+.selbar .btn{border:0;padding:12px 8px}
+.selbar #selCancel{background:#fff;color:var(--c-txt);padding:6px 12px}
+@media(max-width:860px){.selbar .sb-btns{grid-template-columns:repeat(2,1fr)}}
+.b-g1{background:var(--g1);color:#fff}.b-g2{background:var(--g2);color:#fff}.b-zas{background:var(--zas);color:#fff}.b-brak{background:#6c756d;color:#fff}
+
+/* table */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--c-brd);border-radius:var(--radius);background:#fff}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:7px 10px;border-bottom:1px solid #EDF1ED;text-align:left;white-space:nowrap}
+th{background:#F1F4EF;font-size:12px;color:var(--c-txt2);position:sticky;top:0;cursor:pointer}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr:hover{background:#F7FAF6;cursor:pointer}
+.bad{color:var(--c-red);font-weight:700}.warn{color:var(--c-gold);font-weight:700}
+
+/* PD */
+.drop-zone{border:2px dashed var(--c-brd);border-radius:var(--radius);padding:28px;text-align:center;background:#fff}
+.drop-zone.over{border-color:var(--c-pri);background:var(--c-pri-l)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.kpi{background:#fff;border:1px solid var(--c-brd);border-radius:6px;padding:10px}
+.kpi b{display:block;font-size:22px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+.chart-box{position:relative;height:320px}
+.alerts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.alert{border-left:4px solid var(--c-gold);background:#fff;border-radius:6px;padding:10px 12px;border:1px solid var(--c-brd);border-left-width:4px}
+.alert.r{border-left-color:var(--c-red)}
+.alert h4{margin:0 0 6px;font-size:14px}
+.alert .ids{font-size:14px;line-height:1.7}
+.alert .ids span{display:inline-block;background:var(--c-grey-bg);border-radius:4px;padding:0 6px;margin:0 4px 4px 0;cursor:pointer}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(20,30,22,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.modal{background:#fff;width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:12px 12px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px))}
+@media(min-width:700px){.modal-bg{align-items:center}.modal{border-radius:12px}}
+.gbtns{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}
+.gbtns button{border:2px solid transparent;border-radius:8px;padding:14px 8px;font-weight:700;font-size:16px}
+.gbtns button.cur{outline:3px solid var(--c-txt);outline-offset:2px}
+.hist{font-size:13px;color:var(--c-txt2)}
+.hist div{padding:3px 0;border-bottom:1px solid #EDF1ED}
+
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--c-txt);color:#fff;padding:10px 16px;border-radius:8px;z-index:60;font-size:14px;max-width:90vw}
+.login{max-width:420px;margin:12vh auto;text-align:center}
+
+@media(max-width:860px){
+  header{padding:8px 12px}.brand small{display:none}
+  nav.tabs{position:fixed;top:auto;bottom:0;left:0;right:0;border-top:1px solid var(--c-brd);border-bottom:0;padding:0 0 env(safe-area-inset-bottom,0px);justify-content:space-around}
+  nav.tabs button{flex:1;padding:12px 4px;font-size:13px;border-bottom:0;border-top:3px solid transparent}
+  nav.tabs button.on{border-top-color:var(--c-pri)}
+  main{padding:12px 10px 90px}
+  .board{grid-template-columns:1fr}
+  .board .col{display:none}.board .col.mob{display:block}
+  .coltabs{display:flex}
+  input[type=search]{width:100%}
+  .sug{grid-template-columns:24px 48px 1fr;}
+  .sug .acts{grid-column:2/4}
+  .selbar{bottom:0}
+}
+@media print{
+  header,nav.tabs,.no-print,.selbar{display:none!important}
+  body{background:#fff}.card{border:0}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><img src="icon-192.png" alt="">GR Formela<small>gospodarstwo Formela Adam</small></div>
+  <div class="hdr-right"><span id="modeBadge" class="mode"></span><span id="userBox"></span></div>
+</header>
+<nav class="tabs" id="tabs">
+  <button data-t="grupy" class="on">Grupy</button>
+  <button data-t="stado">Stado</button>
+  <button data-t="pd">Próbne doje</button>
+  <button data-t="ust">Ustawienia</button>
+</nav>
+<main id="main"></main>
+<div id="modalRoot"></div>
+<div id="toast" class="hidden"></div>
+
+<script>
+/* ================== KONFIGURACJA FIREBASE ==================
+   Wklej tutaj konfigurację NOWEGO projektu Firebase (nie Stuchowo).
+   Dopóki apiKey zaczyna się od "WKLEJ", aplikacja działa w trybie
+   lokalnym: dane zapisują się tylko w tej przeglądarce.            */
+const firebaseConfig={
+  apiKey:"WKLEJ_API_KEY",
+  authDomain:"WKLEJ.firebaseapp.com",
+  projectId:"WKLEJ",
+  storageBucket:"WKLEJ.firebasestorage.app",
+  messagingSenderId:"",
+  appId:""
+};
+const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
+const APP_VER='0.2.0';
+const FARM={id:'formela',name:'Formela Adam'};
+
+/* ===== PARSER PLIKU SOL ===== */
+// Parser eksportu z SOL/PFHB ("Ostatni próbny dój") -> tablica krów
+const SOL_COLS={
+  'kolczyk':'kolczyk','nr oborowy':'nr','nazwa':'nazwa','nr laktacji':'lakt',
+  'data ost. wycielenia':'dataWyc','data ost. próbnego doju':'dataPd',
+  'dni laktacji w dniu p.d.':'dimPd','kg mleka':'kg','% tłuszczu':'tl','% białka':'bi',
+  '% kazeiny':'kaz','% laktozy':'lak','sucha masa':'sm','lks':'lks','mocznik':'moc',
+  'tł/bi':'tb','sket':'sket','dodatkowe informacje':'info','lokalizacja':'lok'
+};
+function solNum(v){
+  if(v===null||v===undefined||v==='')return null;
+  if(typeof v==='number')return isFinite(v)?v:null;
+  const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.'));
+  return isFinite(n)?n:null;
+}
+function solDate(v){
+  if(v===null||v===undefined||v==='')return null;
+  let d=null;
+  if(v instanceof Date)d=v;
+  else if(typeof v==='number'){d=new Date(Math.round((v-25569)*86400000));}
+  else{
+    const s=String(v).trim();
+    let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m)return `${m[1]}-${m[2]}-${m[3]}`;
+    m=s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
+    if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    return null;
+  }
+  if(isNaN(d))return null;
+  // korekta strefy: bierzemy datę lokalną + 12h, żeby uniknąć przesunięcia o dzień
+  const x=new Date(d.getTime()+12*3600000);
+  return x.toISOString().slice(0,10);
+}
+function parseSOL(rows){
+  const out={rows:[],warnings:[],testDate:null,owner:null};
+  let hi=rows.findIndex(r=>Array.isArray(r)&&r.some(c=>String(c||'').trim().toLowerCase()==='kolczyk'));
+  if(hi<0){out.error='Nie znaleziono wiersza nagłówka z kolumną "Kolczyk". To nie wygląda na eksport próbnego doju z SOL.';return out;}
+  const map={};
+  rows[hi].forEach((c,i)=>{const k=SOL_COLS[String(c||'').trim().toLowerCase()];if(k)map[k]=i;});
+  if(map.kolczyk===undefined){out.error='Brak kolumny "Kolczyk".';return out;}
+  const dates={};
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i]||[];
+    const first=String(r[0]||'');
+    if(/użytkownik:/i.test(first)){const m=first.match(/użytkownik:\s*(.+)/i);if(m)out.owner=m[1].split(/\s{2,}|utworzono/i)[0].trim();continue;}
+    const kol=String(r[map.kolczyk]||'').trim().replace(/\s/g,'');
+    if(!kol||!/^[A-Z]{2}\d{6,}$/i.test(kol))continue;
+    const g=k=>map[k]===undefined?null:r[map[k]];
+    const rec={
+      kolczyk:kol.toUpperCase(),
+      nr:solNum(g('nr')),nazwa:g('nazwa')?String(g('nazwa')).trim():'',
+      lakt:solNum(g('lakt')),dataWyc:solDate(g('dataWyc')),dataPd:solDate(g('dataPd')),
+      dimPd:solNum(g('dimPd')),kg:solNum(g('kg')),tl:solNum(g('tl')),bi:solNum(g('bi')),
+      kaz:solNum(g('kaz')),lak:solNum(g('lak')),sm:solNum(g('sm')),lks:solNum(g('lks')),
+      moc:solNum(g('moc')),tb:solNum(g('tb')),
+      sket:g('sket')===null?null:String(g('sket')).trim(),
+      info:g('info')?String(g('info')).trim():''
+    };
+    if(rec.tb===null&&rec.tl&&rec.bi)rec.tb=Math.round(rec.tl/rec.bi*100)/100;
+    if(rec.dataPd)dates[rec.dataPd]=(dates[rec.dataPd]||0)+1;
+    if(rec.kg!==null&&(rec.kg<0||rec.kg>90))out.warnings.push(`Krowa ${rec.nr??rec.kolczyk}: podejrzana wydajność ${rec.kg} kg`);
+    out.rows.push(rec);
+  }
+  const ds=Object.entries(dates).sort((a,b)=>b[1]-a[1]);
+  out.testDate=ds.length?ds[0][0]:null;
+  if(ds.length>1)out.warnings.push(`W pliku są różne daty próbnego doju (${ds.map(d=>d[0]).join(', ')}). Przyjęto najczęstszą: ${out.testDate}.`);
+  if(!out.rows.length)out.error='Plik nie zawiera żadnej krowy z poprawnym numerem kolczyka.';
+  return out;
+}
+
+
+/* ================== NARZĘDZIA ================== */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayISO=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
+const nowISO=()=>new Date().toISOString();
+const dayDiff=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/86400000);
+const addDays=(iso,n)=>{const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const fDate=iso=>iso?iso.slice(8,10)+'.'+iso.slice(5,7)+'.'+iso.slice(0,4):'–';
+const fNum=(v,d=1)=>v===null||v===undefined||isNaN(v)?'–':Number(v).toLocaleString('pl-PL',{minimumFractionDigits:d,maximumFractionDigits:d});
+const avg=a=>{const v=a.filter(x=>x!==null&&x!==undefined&&!isNaN(x));return v.length?v.reduce((s,x)=>s+x,0)/v.length:null};
+const slug=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ł/g,'l').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||('farma-'+Date.now());
+const clean=o=>JSON.parse(JSON.stringify(o));
+function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.classList.remove('hidden');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.add('hidden'),ms)}
+
+const GR={
+  brak:{n:'Nieprzypisane',s:'—',cls:'brak'},
+  g1:{n:'Grupa 1',s:'G1',cls:'g1'},
+  g2:{n:'Grupa 2',s:'G2',cls:'g2'},
+  zas:{n:'Zasuszone',s:'Zas.',cls:'zas'}
+};
+const GORDER=['brak','g1','g2','zas'];
+const gOf=c=>c.grupa||'brak';
+const chip=g=>`<span class="gchip g-${g}">${GR[g].s==='—'?'brak':GR[g].s}</span>`;
+
+const DEF_SETTINGS={
+  dimG1G2:200,dimG1G2Pierw:null,dniZasuszenia:60,ciaza:282,
+  mocMin:150,mocMax:250,biMin:3.2,biMax:3.6,tbKetoza:1.5,tbSara:1.0,dimSwieze:100,lksProg:400
+};
+
+/* ================== MAGAZYN DANYCH ================== */
+const LocalStore={
+  key:'grformela.v1',
+  _d(){try{return JSON.parse(localStorage.getItem(this.key))||{farms:{}}}catch(e){return{farms:{}}}},
+  _w(d){try{localStorage.setItem(this.key,JSON.stringify(d))}catch(e){toast('Nie udało się zapisać w pamięci przeglądarki: '+e.message,5000)}},
+  async listFarms(){const d=this._d();return Object.entries(d.farms).map(([id,f])=>({id,name:f.name}))},
+  async createFarm(id,name){const d=this._d();d.farms[id]={name,settings:{...DEF_SETTINGS},cows:{},moves:[],tests:{}};this._w(d)},
+  async loadFarm(id){const f=this._d().farms[id];return f?{name:f.name,settings:{...DEF_SETTINGS,...f.settings},cows:f.cows||{},moves:f.moves||[],tests:f.tests||{}}:null},
+  async commit(id,{cows=[],moves=[],test=null,meta=null,delTest=null}){
+    const d=this._d();const f=d.farms[id];if(!f)throw new Error('Brak gospodarstwa');
+    cows.forEach(c=>f.cows[c.kolczyk]=clean(c));
+    moves.forEach(m=>f.moves.unshift(clean(m)));f.moves=f.moves.slice(0,5000);
+    if(test)f.tests[test.date]=clean(test);
+    if(delTest)delete f.tests[delTest];
+    if(meta)Object.assign(f,clean(meta));
+    this._w(d);
+  }
+};
+let db=null;
+const FireStore={
+  async listFarms(){const s=await db.collection('farms').get();return s.docs.map(d=>({id:d.id,name:d.data().name}))},
+  async createFarm(id,name){await db.collection('farms').doc(id).set({name,settings:{...DEF_SETTINGS},created:nowISO()})},
+  async loadFarm(id){
+    const fr=db.collection('farms').doc(id);
+    const [f,cs,ms,ts]=await Promise.all([fr.get(),fr.collection('cows').get(),fr.collection('moves').orderBy('at','desc').limit(2000).get(),fr.collection('tests').get()]);
+    if(!f.exists)return null;
+    const cows={};cs.forEach(d=>cows[d.id]=d.data());
+    const tests={};ts.forEach(d=>tests[d.id]=d.data());
+    return{name:f.data().name,settings:{...DEF_SETTINGS,...(f.data().settings||{})},cows,moves:ms.docs.map(d=>d.data()),tests};
+  },
+  async commit(id,{cows=[],moves=[],test=null,meta=null,delTest=null}){
+    const fr=db.collection('farms').doc(id);
+    const ops=[];
+    cows.forEach(c=>ops.push(b=>b.set(fr.collection('cows').doc(c.kolczyk),clean(c))));
+    moves.forEach(m=>ops.push(b=>b.set(fr.collection('moves').doc(m.id),clean(m))));
+    if(test)ops.push(b=>b.set(fr.collection('tests').doc(test.date),clean(test)));
+    if(delTest)ops.push(b=>b.delete(fr.collection('tests').doc(delTest)));
+    if(meta)ops.push(b=>b.set(fr,clean(meta),{merge:true}));
+    for(let i=0;i<ops.length;i+=400){const b=db.batch();ops.slice(i,i+400).forEach(f=>f(b));await b.commit()}
+  }
+};
+const Store=LOCAL?LocalStore:FireStore;
+
+/* ================== STAN ================== */
+const S={farms:[],farmId:null,farm:null,tab:'grupy',mobCol:'g1',q:'',selMode:false,sel:new Set(),sugOpen:true,
+  stadoG:'all',stadoSort:{k:'nr',d:1},pdDate:null,pending:null,charts:[]};
+
+async function commit(payload){
+  try{await Store.commit(S.farmId,payload);return true}
+  catch(e){console.error(e);toast('Nie zapisano: '+(e.code==='permission-denied'?'brak uprawnień do bazy.':e.message),6000);return false}
+}
+
+/* ================== REGUŁY GRUP ================== */
+function dim(c){if(!c.dataWyc)return null;return dayDiff(c.dataWyc,todayISO())}
+function pinned(c){return c.pin&&(!c.pin.do||c.pin.do>=todayISO())}
+function progG1(c){const s=S.farm.settings;return(c.lakt===1&&s.dimG1G2Pierw)?s.dimG1G2Pierw:s.dimG1G2}
+function planWyc(c){
+  if(c.plWyc)return c.plWyc;
+  return null;
+}
+function suggestion(c){
+  if(c.aktywna===false||pinned(c))return null;
+  const s=S.farm.settings,g=gOf(c),d=dim(c),p=progG1(c);
+  const info=(c.ostPd&&c.ostPd.info||'').toLowerCase();
+  const infoNew=c.ostPd&&(!c.grupaOd||c.ostPd.date>=c.grupaOd.slice(0,10));
+  const zasInfo=info.includes('zasusz');
+  const wycPoZmianie=c.dataWyc&&c.grupaOd&&c.dataWyc>c.grupaOd.slice(0,10);
+  const pw=planWyc(c);
+  if(g==='brak'){
+    if(zasInfo)return{to:'zas',why:'w próbnym doju oznaczona jako zasuszona'};
+    if(d===null)return null;
+    return d<p?{to:'g1',why:`dzień laktacji ${d} (próg ${p})`}:{to:'g2',why:`dzień laktacji ${d} (próg ${p})`};
+  }
+  if(g==='g1'){
+    if(zasInfo&&infoNew)return{to:'zas',why:'w próbnym doju oznaczona jako zasuszona'};
+    if(d!==null&&d>=p)return{to:'g2',why:`dzień laktacji ${d}, próg ${p}`};
+  }
+  if(g==='g2'){
+    if(wycPoZmianie)return{to:'g1',why:`wycielenie ${fDate(c.dataWyc)}`};
+    if(zasInfo&&infoNew)return{to:'zas',why:'w próbnym doju oznaczona jako zasuszona'};
+    if(pw){const left=dayDiff(todayISO(),pw);if(left<=s.dniZasuszenia)return{to:'zas',why:`do planowanego wycielenia ${left} dni`}}
+  }
+  if(g==='zas'){
+    if(wycPoZmianie)return{to:'g1',why:`wycielenie ${fDate(c.dataWyc)}`};
+  }
+  return null;
+}
+async function moveCows(list,to,why=''){
+  const at=nowISO();const cows=[],moves=[];
+  list.forEach(c=>{
+    const from=gOf(c);if(from===to)return;
+    const nc={...c,grupa:to==='brak'?null:to,grupaOd:at,updatedAt:at};
+    cows.push(nc);
+    moves.push({id:at.replace(/\D/g,'')+'-'+c.kolczyk,kolczyk:c.kolczyk,nr:c.nr??null,z:from,na:to,at,powod:why||''});
+  });
+  if(!cows.length)return;
+  if(await commit({cows,moves})){
+    cows.forEach(c=>S.farm.cows[c.kolczyk]=c);S.farm.moves.unshift(...moves.reverse());
+    toast(cows.length===1?`Krowa ${cows[0].nr??''} → ${GR[to].n}`:`Przeniesiono ${cows.length} krów → ${GR[to].n}`);
+    render();
+  }
+}
+
+/* ================== START ================== */
+async function boot(){
+  $('#modeBadge').textContent=LOCAL?'Tryb lokalny':'Online';
+  $('#modeBadge').className='mode'+(LOCAL?' local':'');
+  if(LOCAL){await afterLogin();return}
+  firebase.initializeApp(firebaseConfig);
+  db=firebase.firestore();
+  try{await db.enablePersistence({synchronizeTabs:true})}catch(e){}
+  firebase.auth().onAuthStateChanged(async u=>{
+    if(!u){showLogin();return}
+    $('#userBox').innerHTML=`${esc(u.email)} <button class="btn sm" id="outBtn" style="color:#fff;background:transparent;border-color:#4E7355">Wyloguj</button>`;
+    $('#outBtn').onclick=()=>firebase.auth().signOut();
+    try{await afterLogin()}catch(e){
+      console.error(e);
+      $('#main').innerHTML=`<div class="card login"><h2>Brak dostępu</h2><p>Konto ${esc(u.email)} nie ma uprawnień do bazy. Dodaj ten adres w regułach Firestore (plik firestore.rules).</p></div>`;
+    }
+  });
+}
+function showLogin(){
+  $('#tabs').classList.add('hidden');$('#userBox').innerHTML='';
+  $('#main').innerHTML=`<div class="card login"><img src="icon-192.png" alt="" width="96" height="96" style="border-radius:20px"><h2>GR Formela</h2><p class="muted">Zaloguj się kontem Google, które ma dostęp do danych gospodarstw.</p><button class="btn pri" id="loginBtn">Zaloguj przez Google</button></div>`;
+  $('#loginBtn').onclick=async()=>{
+    const p=new firebase.auth.GoogleAuthProvider();
+    try{await firebase.auth().signInWithPopup(p)}catch(e){try{await firebase.auth().signInWithRedirect(p)}catch(e2){toast('Logowanie nieudane: '+e2.message,5000)}}
+  };
+}
+async function afterLogin(){
+  $('#tabs').classList.remove('hidden');
+  S.farmId=FARM.id;
+  $('#main').innerHTML='<div class="card muted">Wczytywanie danych gospodarstwa…</div>';
+  let f=await Store.loadFarm(FARM.id);
+  if(!f){await Store.createFarm(FARM.id,FARM.name);f=await Store.loadFarm(FARM.id)}
+  S.farm=f;render();
+}
+
+/* ================== NAWIGACJA ================== */
+$('#tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tab=b.dataset.t;
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));S.selMode=false;S.sel.clear();render();window.scrollTo(0,0)};
+function render(){
+  S.charts.forEach(c=>c.destroy());S.charts=[];
+  if(!S.farm)return;
+  ({grupy:renderGrupy,stado:renderStado,pd:renderPD,ust:renderUst})[S.tab]();
+  renderSelBar();
+}
+function openModal(html){
+  $('#modalRoot').innerHTML=`<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;
+  const bg=$('#modalRoot .modal-bg');
+  bg.onclick=e=>{if(e.target===bg||e.target.closest('[data-close]'))closeModal()};
+}
+function closeModal(){$('#modalRoot').innerHTML=''}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+
+/* ================== ZAKŁADKA: GRUPY ================== */
+const activeCows=()=>Object.values(S.farm.cows).filter(c=>c.aktywna!==false);
+function matchQ(c){
+  const q=S.q.trim().toLowerCase();if(!q)return true;
+  return String(c.nr??'').startsWith(q)||(c.nazwa||'').toLowerCase().includes(q)||c.kolczyk.toLowerCase().endsWith(q)||String(c.responder||'').endsWith(q);
+}
+function sortCol(g,a,b){
+  if(g==='zas')return(planWyc(a)||'9999').localeCompare(planWyc(b)||'9999')||(a.nr??1e9)-(b.nr??1e9);
+  if(g==='brak')return(a.nr??1e9)-(b.nr??1e9);
+  return(dim(b)??-1)-(dim(a)??-1);
+}
+function cowCard(c){
+  const g=gOf(c),d=dim(c),sg=suggestion(c);
+  const over=g==='g1'&&d!==null&&d>=progG1(c);
+  let dimTxt=d===null?'':`${d} dni`;
+  if(g==='zas'){const pw=planWyc(c);dimTxt=pw?`wyc. za ${dayDiff(todayISO(),pw)} dni`:'zasuszona'}
+  const pd=c.ostPd;
+  const meta=[c.lakt?`lakt. ${c.lakt}`:'',pd&&pd.kg!=null?`${fNum(pd.kg)} kg`:'',pd&&pd.info?esc(pd.info):''].filter(Boolean).join(' · ');
+  return `<div class="cow${over?' over':''}${S.sel.has(c.kolczyk)?' sel':''}" data-k="${esc(c.kolczyk)}" ${!S.selMode?'draggable="true"':''}>
+    <span class="nr">${esc(c.nr??'?')}</span><span class="nm">${esc(c.nazwa||c.kolczyk)}</span>
+    <span class="dim">${dimTxt}</span>
+    <span class="meta">${meta}${pinned(c)?'<span class="pin" title="Przypięta">📌</span>':''}${sg?`<span class="hint">→ ${GR[sg.to].s}</span>`:''}</span></div>`;
+}
+function renderGrupy(){
+  const cows=activeCows();
+  const sugs=cows.map(c=>({c,s:suggestion(c)})).filter(x=>x.s).sort((a,b)=>(a.c.nr??1e9)-(b.c.nr??1e9));
+  const cnt={brak:0,g1:0,g2:0,zas:0};cows.forEach(c=>cnt[gOf(c)]++);
+  if(!cows.length){
+    $('#main').innerHTML=`<div class="card"><h2>Brak krów</h2><p>Lista krów powstaje z pliku próbnego doju. Wgraj plik z SOL w zakładce <b>Próbne doje</b>, a krowy pojawią się tutaj do przydzielenia.</p><button class="btn pri" onclick="goTab('pd')">Wgraj próbny dój</button></div>`;return;
+  }
+  if(S.mobCol==='brak'&&!cnt.brak)S.mobCol='g1';
+  if(!S.mobInit){S.mobInit=true;if(cnt.brak)S.mobCol='brak'}
+  const colHtml=g=>{
+    const list=cows.filter(c=>gOf(c)===g&&matchQ(c)).sort((a,b)=>sortCol(g,a,b));
+    return `<div class="col${S.mobCol===g?' mob':''}" data-g="${g}"><div class="col-h"><b>${GR[g].n}</b>${S.selMode&&list.length?`<button class="sel-all" data-selall="${g}">zaznacz</button>`:''}<span class="n">${cnt[g]}</span></div>
+      ${list.map(cowCard).join('')||'<div class="muted" style="padding:8px">—</div>'}</div>`;
+  };
+  $('#main').innerHTML=`
+  ${sugs.length?`<div class="card no-print"><div class="sug-head"><span class="sug-count">${sugs.length}</span><div><b>${sugs.length===1?'krowa do przeniesienia':'krów do przeniesienia'}</b><div class="muted">Podpowiedzi według dnia laktacji i próbnego doju. Nic nie przesuwa się bez Twojego potwierdzenia.</div></div>
+    <span class="spacer"></span><button class="btn sm" id="sugToggle">${S.sugOpen?'Zwiń':'Pokaż'}</button><button class="btn sm pri" id="sugAll">Przenieś zaznaczone</button></div>
+    ${S.sugOpen?`<div class="sug-list">${sugs.map(({c,s})=>`<div class="sug"><input type="checkbox" class="sugck" data-k="${esc(c.kolczyk)}" checked aria-label="Zaznacz"><span class="nr">${esc(c.nr??'?')}</span>
+      <div><span class="arrow">${chip(gOf(c))} → ${chip(s.to)}</span> <span class="why">${esc(s.why)}</span></div>
+      <div class="acts"><button class="btn sm" data-sugmove="${esc(c.kolczyk)}">Przenieś</button><button class="btn sm" data-sugskip="${esc(c.kolczyk)}" title="Nie podpowiadaj przez 14 dni">Pomiń 14 dni</button></div></div>`).join('')}</div>`:''}
+  </div>`:''}
+  <div class="board-bar no-print">
+    <input type="search" id="q" placeholder="Szukaj: nr, nazwa, końcówka kolczyka" value="${esc(S.q)}">
+    <button class="btn${S.selMode?' pri':''}" id="selModeBtn">${S.selMode?'Zakończ zaznaczanie':'Zaznacz kilka'}</button>
+    <span class="spacer"></span>
+    <button class="btn" id="printBtn">Drukuj listę grup</button>
+  </div>
+  <div class="coltabs no-print">${GORDER.map(g=>`<button data-mc="${g}" class="${S.mobCol===g?'on':''}">${GR[g].n} ${cnt[g]}</button>`).join('')}</div>
+  <div class="board" id="board">${GORDER.map(colHtml).join('')}</div>`;
+  bindGrupy();
+}
+function bindGrupy(){
+  const q=$('#q');q.oninput=()=>{S.q=q.value;const pos=q.selectionStart;renderGrupy();const n=$('#q');n.focus();n.setSelectionRange(pos,pos)};
+  $('#selModeBtn').onclick=()=>{S.selMode=!S.selMode;S.sel.clear();render()};
+  $('#printBtn').onclick=printGroups;
+  document.querySelectorAll('[data-mc]').forEach(b=>b.onclick=()=>{S.mobCol=b.dataset.mc;renderGrupy()});
+  document.querySelectorAll('[data-selall]').forEach(b=>b.onclick=()=>{
+    const g=b.dataset.selall;activeCows().filter(c=>gOf(c)===g&&matchQ(c)).forEach(c=>S.sel.add(c.kolczyk));render()});
+  const st=$('#sugToggle');if(st)st.onclick=()=>{S.sugOpen=!S.sugOpen;renderGrupy()};
+  const sa=$('#sugAll');if(sa)sa.onclick=async()=>{
+    const ks=[...document.querySelectorAll('.sugck:checked')].map(x=>x.dataset.k);
+    if(!ks.length&&S.sugOpen)return toast('Nic nie zaznaczono');
+    const list=(S.sugOpen?ks:activeCows().filter(c=>suggestion(c)).map(c=>c.kolczyk)).map(k=>S.farm.cows[k]);
+    const by={};list.forEach(c=>{const s=suggestion(c);if(s)(by[s.to]=by[s.to]||[]).push(c)});
+    for(const to of Object.keys(by))await moveCows(by[to],to,'podpowiedź');
+  };
+  document.querySelectorAll('[data-sugmove]').forEach(b=>b.onclick=()=>{const c=S.farm.cows[b.dataset.sugmove];const s=suggestion(c);if(s)moveCows([c],s.to,s.why)});
+  document.querySelectorAll('[data-sugskip]').forEach(b=>b.onclick=async()=>{
+    const c={...S.farm.cows[b.dataset.sugskip],pin:{do:addDays(todayISO(),14),powod:'pominięta podpowiedź'},updatedAt:nowISO()};
+    if(await commit({cows:[c]})){S.farm.cows[c.kolczyk]=c;toast(`Krowa ${c.nr??''}: podpowiedź ukryta na 14 dni`);render()}
+  });
+  const board=$('#board');
+  board.onclick=e=>{
+    const el=e.target.closest('.cow');if(!el)return;const k=el.dataset.k;
+    if(S.selMode){S.sel.has(k)?S.sel.delete(k):S.sel.add(k);el.classList.toggle('sel');renderSelBar()}
+    else cowSheet(k);
+  };
+  board.addEventListener('dragstart',e=>{const el=e.target.closest('.cow');if(!el)return;e.dataTransfer.setData('text/plain',el.dataset.k);e.dataTransfer.effectAllowed='move'});
+  board.querySelectorAll('.col').forEach(col=>{
+    col.addEventListener('dragover',e=>{e.preventDefault();col.classList.add('drop')});
+    col.addEventListener('dragleave',e=>{if(!col.contains(e.relatedTarget))col.classList.remove('drop')});
+    col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('drop');const k=e.dataTransfer.getData('text/plain');const c=S.farm.cows[k];if(c)moveCows([c],col.dataset.g,'ręcznie')});
+  });
+}
+window.goTab=t=>{document.querySelector(`#tabs button[data-t="${t}"]`).click()};
+function renderSelBar(){
+  let bar=$('#selbar');
+  if(!S.selMode||S.tab!=='grupy'){if(bar)bar.remove();return}
+  if(!bar){bar=document.createElement('div');bar.id='selbar';bar.className='selbar';document.body.appendChild(bar)}
+  const n=S.sel.size;
+  bar.innerHTML=`<div class="sb-top"><b>${n?`Zaznaczono ${n}. Przenieś do:`:'Dotknij krowy, aby je zaznaczyć'}</b><span class="spacer"></span><button class="btn" id="selCancel">Anuluj</button></div>
+    ${n?`<div class="sb-btns">${['g1','g2','zas','brak'].map(g=>`<button class="btn b-${g}" data-to="${g}">${g==='brak'?'Nieprzypisane':GR[g].n}</button>`).join('')}</div>`:''}`;
+  bar.querySelectorAll('[data-to]').forEach(b=>b.onclick=async()=>{const list=[...S.sel].map(k=>S.farm.cows[k]);S.sel.clear();S.selMode=false;await moveCows(list,b.dataset.to,'ręcznie, grupowo');render()});
+  $('#selCancel').onclick=()=>{S.sel.clear();S.selMode=false;render()};
+}
+function cowSheet(k){
+  const c=S.farm.cows[k];if(!c)return;const g=gOf(c),d=dim(c),sg=suggestion(c);
+  const hist=S.farm.moves.filter(m=>m.kolczyk===k).slice(0,20);
+  const pds=Object.values(S.farm.tests).map(t=>({date:t.date,r:(t.rows||[]).find(r=>r.kolczyk===k)})).filter(x=>x.r).sort((a,b)=>b.date.localeCompare(a.date));
+  openModal(`<div class="row"><h2 style="margin:0">Krowa ${esc(c.nr??'?')}</h2>${chip(g)}<span class="spacer"></span><button class="btn sm" data-close>Zamknij</button></div>
+  <div class="muted">${esc(c.nazwa||'')} · ${esc(c.kolczyk)}${c.responder?' · resp. '+esc(c.responder):''}</div>
+  <div class="muted">Laktacja ${esc(c.lakt??'–')} · wycielenie ${fDate(c.dataWyc)} · dzień laktacji ${d??'–'}${c.grupaOd?' · w grupie od '+fDate(c.grupaOd.slice(0,10)):''}</div>
+  ${sg?`<p class="warn" style="margin:8px 0 0">Podpowiedź: ${GR[sg.to].n} (${esc(sg.why)})</p>`:''}
+  <div class="gbtns">${['g1','g2','zas','brak'].map(x=>`<button class="b-${x}${x===g?' cur':''}" data-mv="${x}">${GR[x].n}</button>`).join('')}</div>
+  <div class="grid2">
+    <label class="f">Planowane wycielenie<input type="date" id="csPw" value="${esc(c.plWyc||'')}"></label>
+    <label class="f">Przypięta do (bez podpowiedzi)<input type="date" id="csPin" value="${esc(c.pin&&c.pin.do||'')}"></label>
+  </div>
+  <label class="f" style="margin-top:10px">Powód przypięcia / notatka<input type="text" id="csNote" value="${esc((c.pin&&c.pin.powod)||c.notatka||'')}"></label>
+  <label class="row" style="margin-top:10px;font-size:14px"><input type="checkbox" id="csAkt" ${c.aktywna===false?'checked':''}> Usunięta ze stada (ukryj)</label>
+  <div class="row" style="margin-top:12px"><span class="spacer"></span><button class="btn pri" id="csSave">Zapisz</button></div>
+  <h3 style="margin-top:16px">Próbne doje</h3>
+  ${pds.length?`<div class="tbl-wrap"><table><thead><tr><th>Data</th><th class="n">DIM</th><th class="n">kg</th><th class="n">tł</th><th class="n">bi</th><th class="n">T/B</th><th class="n">mocz.</th><th class="n">LKS</th></tr></thead><tbody>
+  ${pds.map(({date,r})=>`<tr><td>${fDate(date)}</td><td class="n">${r.dimPd??'–'}</td><td class="n">${fNum(r.kg)}</td><td class="n">${fNum(r.tl,2)}</td><td class="n">${fNum(r.bi,2)}</td><td class="n">${fNum(r.tb,2)}</td><td class="n">${fNum(r.moc,0)}</td><td class="n ${r.lks>S.farm.settings.lksProg?'bad':''}">${fNum(r.lks,0)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Brak.</p>'}
+  <h3 style="margin-top:16px">Historia grup</h3>
+  <div class="hist">${hist.map(m=>`<div>${fDate(m.at.slice(0,10))}: ${GR[m.z].n} → ${GR[m.na].n}${m.powod?' ('+esc(m.powod)+')':''}</div>`).join('')||'Brak przesunięć.'}</div>`);
+  document.querySelectorAll('[data-mv]').forEach(b=>b.onclick=async()=>{closeModal();await moveCows([c],b.dataset.mv,'ręcznie')});
+  $('#csSave').onclick=async()=>{
+    const pinDo=$('#csPin').value,note=$('#csNote').value.trim();
+    const nc={...c,plWyc:$('#csPw').value||null,pin:pinDo?{do:pinDo,powod:note}:null,notatka:pinDo?(c.notatka||''):note,aktywna:!$('#csAkt').checked,updatedAt:nowISO()};
+    if(await commit({cows:[nc]})){S.farm.cows[k]=nc;closeModal();toast('Zapisano');render()}
+  };
+}
+function printGroups(){
+  const cows=activeCows();
+  const w=window.open('','_blank');if(!w)return toast('Przeglądarka zablokowała nowe okno');
+  const sec=g=>{const l=cows.filter(c=>gOf(c)===g).sort((a,b)=>(a.nr??1e9)-(b.nr??1e9));
+    return `<h2>${GR[g].n} (${l.length})</h2><table><tr><th>Nr</th><th>Nazwa</th><th>Kolczyk</th><th>Lakt.</th><th>Dzień lakt.</th><th>Podpowiedź</th></tr>${l.map(c=>{const s=suggestion(c);return`<tr><td><b>${esc(c.nr??'')}</b></td><td>${esc(c.nazwa||'')}</td><td>${esc(c.kolczyk)}</td><td>${esc(c.lakt??'')}</td><td>${dim(c)??''}</td><td>${s?'→ '+GR[s.to].n:''}</td></tr>`}).join('')}</table>`};
+  w.document.write(`<html><head><meta charset="utf-8"><title>Grupy – ${esc(S.farm.name)}</title><style>body{font-family:Segoe UI,Arial;font-size:12px}table{border-collapse:collapse;width:100%;margin-bottom:14px}td,th{border:1px solid #bbb;padding:3px 6px;text-align:left}h1{font-size:16px}h2{font-size:14px;margin:12px 0 4px}</style></head><body><h1>${esc(S.farm.name)} – grupy, ${fDate(todayISO())}</h1>${['g1','g2','zas','brak'].map(sec).join('')}<script>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+/* ================== ZAKŁADKA: STADO ================== */
+const STADO_COLS=[
+  ['nr','Nr',c=>c.nr,1],['nazwa','Nazwa',c=>c.nazwa||''],['kolczyk','Kolczyk',c=>c.kolczyk],['grupa','Grupa',c=>GORDER.indexOf(gOf(c))],
+  ['lakt','Lakt.',c=>c.lakt,1],['dataWyc','Wycielenie',c=>c.dataWyc||''],['dim','Dzień lakt.',c=>dim(c),1],
+  ['kg','kg (PD)',c=>c.ostPd?.kg,1],['tl','Tł %',c=>c.ostPd?.tl,1],['bi','Bi %',c=>c.ostPd?.bi,1],['tb','T/B',c=>c.ostPd?.tb,1],
+  ['moc','Mocznik',c=>c.ostPd?.moc,1],['lks','LKS',c=>c.ostPd?.lks,1],['info','Uwagi PD',c=>c.ostPd?.info||'']
+];
+function stadoRows(){
+  let l=Object.values(S.farm.cows).filter(c=>S.stadoG==='gone'?c.aktywna===false:c.aktywna!==false);
+  if(S.stadoG!=='all'&&S.stadoG!=='gone')l=l.filter(c=>gOf(c)===S.stadoG);
+  l=l.filter(matchQ);
+  const col=STADO_COLS.find(x=>x[0]===S.stadoSort.k),f=col[2],dir=S.stadoSort.d;
+  return l.sort((a,b)=>{const x=f(a),y=f(b);if(x===y)return 0;if(x===null||x===undefined||x==='')return 1;if(y===null||y===undefined||y==='')return -1;return(x>y?1:-1)*dir});
+}
+function renderStado(){
+  const s=S.farm.settings,rows=stadoRows();
+  const cell=(c,k)=>{const p=c.ostPd||{};switch(k){
+    case'nr':return`<td class="n"><b>${esc(c.nr??'')}</b></td>`;
+    case'nazwa':return`<td>${esc(c.nazwa||'')}${pinned(c)?' 📌':''}</td>`;
+    case'kolczyk':return`<td>${esc(c.kolczyk)}</td>`;
+    case'grupa':return`<td>${chip(gOf(c))}</td>`;
+    case'lakt':return`<td class="n">${esc(c.lakt??'')}</td>`;
+    case'dataWyc':return`<td>${fDate(c.dataWyc)}</td>`;
+    case'dim':{const d=dim(c);return`<td class="n ${gOf(c)==='g1'&&d>=progG1(c)?'bad':''}">${d??'–'}</td>`}
+    case'kg':return`<td class="n">${fNum(p.kg)}</td>`;
+    case'tl':return`<td class="n">${fNum(p.tl,2)}</td>`;
+    case'bi':return`<td class="n ${p.bi!=null&&(p.bi<s.biMin)?'warn':''}">${fNum(p.bi,2)}</td>`;
+    case'tb':return`<td class="n ${p.tb!=null&&(p.tb>s.tbKetoza||p.tb<s.tbSara)?'bad':''}">${fNum(p.tb,2)}</td>`;
+    case'moc':return`<td class="n ${p.moc!=null&&(p.moc<s.mocMin||p.moc>s.mocMax)?'warn':''}">${fNum(p.moc,0)}</td>`;
+    case'lks':return`<td class="n ${p.lks>s.lksProg?'bad':''}">${fNum(p.lks,0)}</td>`;
+    case'info':return`<td>${esc(p.info||'')}</td>`;
+  }};
+  const fl=[['all','Wszystkie'],['g1','Grupa 1'],['g2','Grupa 2'],['zas','Zasuszone'],['brak','Nieprzypisane'],['gone','Usunięte']];
+  $('#main').innerHTML=`<div class="board-bar">
+    <input type="search" id="q" placeholder="Szukaj: nr, nazwa, kolczyk" value="${esc(S.q)}">
+    <div class="row">${fl.map(([k,n])=>`<button class="btn sm${S.stadoG===k?' pri':''}" data-fg="${k}">${n}</button>`).join('')}</div>
+    <span class="spacer"></span><span class="muted">${rows.length} krów</span><button class="btn" id="expBtn">Eksport do Excela</button></div>
+  <div class="tbl-wrap"><table><thead><tr>${STADO_COLS.map(([k,n,,num])=>`<th class="${num?'n':''}" data-sk="${k}">${n}${S.stadoSort.k===k?(S.stadoSort.d>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
+  <tbody>${rows.map(c=>`<tr data-k="${esc(c.kolczyk)}">${STADO_COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="14" class="muted">Brak krów w tym widoku.</td></tr>`}</tbody></table></div>
+  <p class="muted">Wartości składu mleka pochodzą z ostatniego wgranego próbnego doju. Kolorem oznaczone wartości poza normami z Ustawień.</p>`;
+  const q=$('#q');q.oninput=()=>{S.q=q.value;const p=q.selectionStart;renderStado();const n=$('#q');n.focus();n.setSelectionRange(p,p)};
+  document.querySelectorAll('[data-fg]').forEach(b=>b.onclick=()=>{S.stadoG=b.dataset.fg;renderStado()});
+  document.querySelectorAll('[data-sk]').forEach(th=>th.onclick=()=>{const k=th.dataset.sk;S.stadoSort=S.stadoSort.k===k?{k,d:-S.stadoSort.d}:{k,d:1};renderStado()});
+  document.querySelectorAll('tbody tr[data-k]').forEach(tr=>tr.onclick=()=>cowSheet(tr.dataset.k));
+  $('#expBtn').onclick=()=>{
+    const data=rows.map(c=>{const p=c.ostPd||{};return{'Nr':c.nr,'Nazwa':c.nazwa,'Kolczyk':c.kolczyk,'Grupa':GR[gOf(c)].n,'W grupie od':c.grupaOd?c.grupaOd.slice(0,10):'','Laktacja':c.lakt,'Wycielenie':c.dataWyc,'Dzień laktacji':dim(c),'Planowane wycielenie':c.plWyc||'','PD data':p.date||'','kg':p.kg,'Tł %':p.tl,'Bi %':p.bi,'T/B':p.tb,'Mocznik':p.moc,'LKS':p.lks,'Uwagi PD':p.info||'','Notatka':c.notatka||''}});
+    const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Stado');
+    XLSX.writeFile(wb,`stado_formela_${todayISO()}.xlsx`);
+  };
+}
+
+/* ================== ZAKŁADKA: PRÓBNE DOJE ================== */
+function renderPD(){
+  const dates=Object.keys(S.farm.tests).sort().reverse();
+  if(!S.pdDate||!S.farm.tests[S.pdDate])S.pdDate=dates[0]||null;
+  $('#main').innerHTML=`
+  <div class="card no-print">
+    <div class="row"><div><h2>Wgraj próbny dój</h2><div class="muted">Plik Excel z SOL/PFHB („Ostatni próbny dój”). Krowy dopasowuję po numerze kolczyka.</div></div></div>
+    <div class="drop-zone" id="dz" style="margin-top:12px"><p style="margin:0 0 10px">Przeciągnij plik tutaj albo</p>
+    <label class="btn pri">Wybierz plik<input type="file" id="pdFile" accept=".xlsx,.xls,.csv" hidden></label></div>
+    <div id="pdPreview"></div>
+  </div>
+  ${dates.length?`<div class="card"><div class="row"><h2 style="margin:0">Analiza</h2><select id="pdSel">${dates.map(d=>`<option value="${d}"${d===S.pdDate?' selected':''}>${fDate(d)}</option>`).join('')}</select>
+    <span class="spacer"></span><button class="btn sm danger" id="pdDel">Usuń ten próbny dój</button></div>
+    <p class="muted">Grupy według Twojego bieżącego podziału w zakładce Grupy.</p><div id="pdAn"></div></div>`:
+    '<div class="card muted">Nie ma jeszcze żadnego próbnego doju. Wgraj pierwszy plik powyżej.</div>'}`;
+  const dz=$('#dz'),fi=$('#pdFile');
+  fi.onchange=()=>fi.files[0]&&readPDFile(fi.files[0]);
+  dz.ondragover=e=>{e.preventDefault();dz.classList.add('over')};dz.ondragleave=()=>dz.classList.remove('over');
+  dz.ondrop=e=>{e.preventDefault();dz.classList.remove('over');const f=e.dataTransfer.files[0];if(f)readPDFile(f)};
+  if(S.pending)showPreview();
+  if(dates.length){
+    $('#pdSel').onchange=e=>{S.pdDate=e.target.value;render()};
+    $('#pdDel').onclick=async()=>{if(!confirm(`Usunąć próbny dój z ${fDate(S.pdDate)}? Dane krów zostają.`))return;
+      if(await commit({delTest:S.pdDate})){delete S.farm.tests[S.pdDate];S.pdDate=null;toast('Usunięto');render()}};
+    renderAnalysis();
+  }
+}
+function readPDFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:null});
+      const p=parseSOL(rows);
+      if(p.error){S.pending=null;$('#pdPreview').innerHTML=`<p class="bad" style="margin-top:12px">${esc(p.error)}</p>`;return}
+      p.fileName=file.name;S.pending=p;showPreview();
+    }catch(err){$('#pdPreview').innerHTML=`<p class="bad">Nie udało się odczytać pliku: ${esc(err.message)}</p>`}
+  };
+  r.readAsArrayBuffer(file);
+}
+function showPreview(){
+  const p=S.pending,cows=S.farm.cows;
+  const inFile=new Set(p.rows.map(r=>r.kolczyk));
+  const nowe=p.rows.filter(r=>!cows[r.kolczyk]);
+  const brakWyn=p.rows.filter(r=>r.kg===null);
+  const absent=Object.values(cows).filter(c=>c.aktywna!==false&&!inFile.has(c.kolczyk));
+  const exists=!!S.farm.tests[p.testDate];
+  $('#pdPreview').innerHTML=`<div style="margin-top:14px">
+    <div class="kpis">
+      <div class="kpi"><span class="muted">Data próbnego doju</span><b>${fDate(p.testDate)}</b></div>
+      <div class="kpi"><span class="muted">Krów w pliku</span><b>${p.rows.length}</b></div>
+      <div class="kpi"><span class="muted">Z wynikami</span><b>${p.rows.length-brakWyn.length}</b></div>
+      <div class="kpi"><span class="muted">Nowe krowy</span><b>${nowe.length}</b></div>
+    </div>
+    ${p.owner&&p.owner.toLowerCase()!==S.farm.name.toLowerCase()?`<p class="warn">Plik jest dla użytkownika „${esc(p.owner)}”, a ta aplikacja jest dla gospodarstwa „${esc(S.farm.name)}”. Sprawdź, czy to właściwy plik.</p>`:''}
+    ${exists?`<p class="warn">Próbny dój z ${fDate(p.testDate)} jest już zapisany. Zapis go nadpisze.</p>`:''}
+    ${brakWyn.length?`<p class="muted">Bez wyników: ${brakWyn.map(r=>`${esc(r.nr??r.kolczyk)}${r.info?' ('+esc(r.info)+')':''}`).join(', ')}</p>`:''}
+    ${p.warnings.map(w=>`<p class="warn">${esc(w)}</p>`).join('')}
+    ${absent.length?`<p><b>${absent.length}</b> krów z bazy nie ma w pliku: ${absent.map(c=>esc(c.nr??c.kolczyk)).join(', ')}.<br>
+      <label><input type="checkbox" id="markGone"> Oznacz je jako usunięte ze stada</label></p>`:''}
+    <div class="row"><span class="spacer"></span><button class="btn" id="pdCancel">Anuluj</button><button class="btn pri" id="pdSave">Zapisz próbny dój</button></div></div>`;
+  $('#pdCancel').onclick=()=>{S.pending=null;$('#pdPreview').innerHTML=''};
+  $('#pdSave').onclick=async()=>{
+    const at=nowISO(),upd=[];
+    p.rows.forEach(r=>{
+      const c=cows[r.kolczyk]||{kolczyk:r.kolczyk,grupa:null,createdAt:at};
+      const nc={...c,nr:r.nr??c.nr??null,nazwa:r.nazwa||c.nazwa||'',lakt:r.lakt??c.lakt??null,aktywna:true,updatedAt:at};
+      if(r.dataWyc&&(!c.dataWyc||r.dataWyc>=c.dataWyc))nc.dataWyc=r.dataWyc;
+      if(!c.ostPd||p.testDate>=c.ostPd.date)nc.ostPd={date:p.testDate,kg:r.kg,tl:r.tl,bi:r.bi,tb:r.tb,moc:r.moc,lks:r.lks,sket:r.sket,info:r.info};
+      upd.push(nc);
+    });
+    if($('#markGone')&&$('#markGone').checked)absent.forEach(c=>upd.push({...c,aktywna:false,updatedAt:at}));
+    const test={date:p.testDate,fileName:p.fileName||'',importedAt:at,owner:p.owner||'',rows:p.rows};
+    $('#pdSave').disabled=true;
+    if(await commit({cows:upd,test})){
+      upd.forEach(c=>S.farm.cows[c.kolczyk]=c);S.farm.tests[test.date]=test;S.pdDate=test.date;S.pending=null;
+      toast(`Zapisano próbny dój z ${fDate(test.date)}: ${p.rows.length} krów`);render();
+    }else $('#pdSave').disabled=false;
+  };
+}
+const zonePlugin={id:'zone',beforeDatasetsDraw(ch,a,o){
+  if(!o||o.x0===undefined)return;const{ctx,chartArea:ca,scales:{x,y}}=ch;ctx.save();ctx.beginPath();ctx.rect(ca.left,ca.top,ca.width,ca.height);ctx.clip();
+  ctx.fillStyle='rgba(47,107,58,.10)';const X0=x.getPixelForValue(o.x0),X1=x.getPixelForValue(o.x1),Y0=y.getPixelForValue(o.y1),Y1=y.getPixelForValue(o.y0);
+  ctx.fillRect(X0,Y0,X1-X0,Y1-Y0);ctx.strokeStyle='rgba(47,107,58,.5)';ctx.setLineDash([4,4]);ctx.strokeRect(X0,Y0,X1-X0,Y1-Y0);ctx.restore()}};
+const vlinePlugin={id:'vline',beforeDatasetsDraw(ch,a,o){
+  if(!o||o.x===undefined)return;const{ctx,chartArea:ca,scales:{x}}=ch;const X=x.getPixelForValue(o.x);if(X<ca.left||X>ca.right)return;
+  ctx.save();ctx.strokeStyle='#B3392C';ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(X,ca.top);ctx.lineTo(X,ca.bottom);ctx.stroke();
+  ctx.fillStyle='#B3392C';ctx.font='12px Segoe UI, sans-serif';ctx.fillText(o.label||'',X+4,ca.top+12);ctx.restore()}};
+const GCOL={g1:'#2F6B3A',g2:'#B08A12',zas:'#3F6385',brak:'#8A948B'};
+function renderAnalysis(){
+  const s=S.farm.settings,t=S.farm.tests[S.pdDate];
+  const rows=(t.rows||[]).map(r=>({...r,g:gOf(S.farm.cows[r.kolczyk]||{})}));
+  const withRes=rows.filter(r=>r.kg!==null);
+  const grp=['all','g1','g2','brak'];
+  const stat=l=>({n:l.length,kg:avg(l.map(r=>r.kg)),tl:avg(l.map(r=>r.tl)),bi:avg(l.map(r=>r.bi)),tb:avg(l.map(r=>r.tb)),moc:avg(l.map(r=>r.moc)),lks:avg(l.map(r=>r.lks)),lksHi:l.filter(r=>r.lks>s.lksProg).length,dim:avg(l.map(r=>r.dimPd))});
+  const st=grp.map(g=>({g,...stat(g==='all'?withRes:withRes.filter(r=>r.g===g))})).filter(x=>x.n||x.g==='all');
+  const ket=withRes.filter(r=>r.tb>s.tbKetoza&&r.dimPd!==null&&r.dimPd<=s.dimSwieze);
+  const sara=withRes.filter(r=>r.tb!==null&&r.tb<s.tbSara);
+  const lksHi=withRes.filter(r=>r.lks>s.lksProg).sort((a,b)=>b.lks-a.lks);
+  const sket=rows.filter(r=>(r.sket||'').toLowerCase()==='tak');
+  const mocLo=withRes.filter(r=>r.moc!==null&&r.moc<s.mocMin),mocHi=withRes.filter(r=>r.moc>s.mocMax);
+  const ids=l=>l.map(r=>`<span data-ck="${esc(r.kolczyk)}">${esc(r.nr??'?')}</span>`).join('')||'<span class="muted" style="background:none">brak</span>';
+  const allDates=Object.keys(S.farm.tests).sort();
+  $('#pdAn').innerHTML=`
+  <div class="tbl-wrap"><table><thead><tr><th>Grupa</th><th class="n">Krów z wynikiem</th><th class="n">Śr. dzień lakt.</th><th class="n">kg</th><th class="n">Tł %</th><th class="n">Bi %</th><th class="n">T/B</th><th class="n">Mocznik</th><th class="n">Śr. LKS</th><th class="n">LKS &gt; ${s.lksProg}</th></tr></thead><tbody>
+  ${st.map(x=>`<tr><td>${x.g==='all'?'<b>Całe stado</b>':chip(x.g)}</td><td class="n">${x.n}</td><td class="n">${fNum(x.dim,0)}</td><td class="n"><b>${fNum(x.kg)}</b></td><td class="n">${fNum(x.tl,2)}</td><td class="n">${fNum(x.bi,2)}</td><td class="n">${fNum(x.tb,2)}</td><td class="n">${fNum(x.moc,0)}</td><td class="n">${fNum(x.lks,0)}</td><td class="n">${x.lksHi}</td></tr>`).join('')}
+  </tbody></table></div>
+  <h3 style="margin-top:18px">Do sprawdzenia</h3>
+  <div class="alerts">
+    <div class="alert r"><h4>Ryzyko ketozy: T/B &gt; ${fNum(s.tbKetoza,1)}, do ${s.dimSwieze} dnia (${ket.length})</h4><div class="ids">${ids(ket)}</div></div>
+    <div class="alert r"><h4>Ryzyko kwasicy: T/B &lt; ${fNum(s.tbSara,1)} (${sara.length})</h4><div class="ids">${ids(sara)}</div></div>
+    <div class="alert r"><h4>LKS &gt; ${s.lksProg} tys./ml (${lksHi.length})</h4><div class="ids">${ids(lksHi)}</div></div>
+    <div class="alert"><h4>Mocznik &lt; ${s.mocMin} (${mocLo.length})</h4><div class="ids">${ids(mocLo)}</div></div>
+    <div class="alert"><h4>Mocznik &gt; ${s.mocMax} (${mocHi.length})</h4><div class="ids">${ids(mocHi)}</div></div>
+    <div class="alert"><h4>Sket: tak (${sket.length})</h4><div class="ids">${ids(sket)}</div></div>
+  </div>
+  <div class="charts" style="margin-top:18px">
+    <div><h3>Mocznik a białko</h3><div class="chart-box"><canvas id="chMB"></canvas></div><p class="muted">Zielone pole: mocznik ${s.mocMin}–${s.mocMax} mg/l, białko ${fNum(s.biMin,2)}–${fNum(s.biMax,2)}%.</p></div>
+    <div><h3>Wydajność a dzień laktacji</h3><div class="chart-box"><canvas id="chKD"></canvas></div><p class="muted">Czerwona linia: próg przejścia z grupy 1 do 2 (${s.dimG1G2} dni).</p></div>
+    ${allDates.length>1?`<div><h3>Trend średnich (całe stado)</h3><div class="chart-box"><canvas id="chTr"></canvas></div></div>`:''}
+  </div>`;
+  document.querySelectorAll('[data-ck]').forEach(x=>x.onclick=()=>cowSheet(x.dataset.ck));
+  const byG=f=>['g1','g2','zas','brak'].map(g=>({label:GR[g].n,data:withRes.filter(r=>r.g===g).map(f).filter(p=>p.x!==null&&p.y!==null),backgroundColor:GCOL[g],pointRadius:5})).filter(d=>d.data.length);
+  const common={responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`Krowa ${c.raw.nr}: ${c.raw.x} / ${c.raw.y}`}}}};
+  S.charts.push(new Chart($('#chMB'),{type:'scatter',data:{datasets:byG(r=>({x:r.moc,y:r.bi,nr:r.nr}))},plugins:[zonePlugin],
+    options:{...common,plugins:{...common.plugins,zone:{x0:s.mocMin,x1:s.mocMax,y0:s.biMin,y1:s.biMax}},scales:{x:{title:{display:true,text:'Mocznik mg/l'}},y:{title:{display:true,text:'Białko %'}}}}}));
+  S.charts.push(new Chart($('#chKD'),{type:'scatter',data:{datasets:byG(r=>({x:r.dimPd,y:r.kg,nr:r.nr}))},plugins:[vlinePlugin],
+    options:{...common,plugins:{...common.plugins,vline:{x:s.dimG1G2,label:`próg ${s.dimG1G2}`}},scales:{x:{title:{display:true,text:'Dzień laktacji w dniu PD'},min:0},y:{title:{display:true,text:'kg mleka'},min:0}}}}));
+  if(allDates.length>1){
+    const tr=allDates.map(d=>{const l=(S.farm.tests[d].rows||[]).filter(r=>r.kg!==null);return{d,kg:avg(l.map(r=>r.kg)),moc:avg(l.map(r=>r.moc)),tb:avg(l.map(r=>r.tb))}});
+    S.charts.push(new Chart($('#chTr'),{type:'line',data:{labels:tr.map(x=>fDate(x.d)),datasets:[
+      {label:'kg mleka',data:tr.map(x=>x.kg),borderColor:'#2F6B3A',yAxisID:'y'},
+      {label:'Mocznik',data:tr.map(x=>x.moc),borderColor:'#B08A12',yAxisID:'y1'}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'bottom'}},scales:{y:{title:{display:true,text:'kg'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'mg/l'}}}}}));
+  }
+}
+
+/* ================== ZAKŁADKA: USTAWIENIA ================== */
+function renderUst(){
+  const s=S.farm.settings;
+  const num=(k,label,step=1)=>`<label class="f">${label}<input type="number" step="${step}" data-s="${k}" value="${s[k]??''}"></label>`;
+  $('#main').innerHTML=`
+  <div class="card"><h2>Reguły grup</h2><p class="muted">Na ich podstawie aplikacja podpowiada przesunięcia. Przesunięcie zawsze zatwierdzasz sam.</p>
+    <div class="grid2">${num('dimG1G2','Grupa 1 → 2: od dnia laktacji')}${num('dimG1G2Pierw','Próg dla pierwiastek (puste = jak wyżej)')}
+    ${num('dniZasuszenia','Zasuszenie: dni przed wycieleniem')}${num('ciaza','Długość ciąży (dni)')}</div></div>
+  <div class="card"><h2>Normy do analizy próbnych dojów</h2><div class="grid2">
+    ${num('mocMin','Mocznik min (mg/l)')}${num('mocMax','Mocznik max (mg/l)')}${num('biMin','Białko min (%)',0.01)}${num('biMax','Białko max (%)',0.01)}
+    ${num('tbKetoza','T/B powyżej = ryzyko ketozy',0.05)}${num('dimSwieze','…do dnia laktacji')}${num('tbSara','T/B poniżej = ryzyko kwasicy',0.05)}${num('lksProg','LKS alarm (tys./ml)')}</div>
+    <div class="row" style="margin-top:14px"><span class="spacer"></span><button class="btn" id="defBtn">Przywróć domyślne</button><button class="btn pri" id="saveSet">Zapisz ustawienia</button></div></div>
+  <div class="card"><h2>Dane</h2><p class="muted">${LOCAL?'<b>Tryb lokalny:</b> dane są tylko w tej przeglądarce. Po podłączeniu Firebase zaimportuj kopię, żeby je przenieść.':'Dane zapisują się w Firebase i są dostępne na każdym urządzeniu po zalogowaniu.'}</p>
+    <div class="row"><button class="btn" id="bkExp">Pobierz kopię (JSON)</button><label class="btn">Wczytaj kopię<input type="file" id="bkImp" accept=".json" hidden></label></div>
+    <p class="muted" style="margin-top:12px">GR Formela, wersja ${APP_VER}</p></div>`;
+  $('#saveSet').onclick=async()=>{
+    const ns={...s};document.querySelectorAll('[data-s]').forEach(i=>{const v=i.value.trim();ns[i.dataset.s]=v===''?null:Number(v)});
+    ['dimG1G2','dniZasuszenia','ciaza','mocMin','mocMax','biMin','biMax','tbKetoza','tbSara','dimSwieze','lksProg'].forEach(k=>{if(ns[k]===null||isNaN(ns[k]))ns[k]=DEF_SETTINGS[k]});
+    if(await commit({meta:{settings:ns}})){S.farm.settings=ns;toast('Zapisano ustawienia')}
+  };
+  $('#defBtn').onclick=()=>{document.querySelectorAll('[data-s]').forEach(i=>i.value=DEF_SETTINGS[i.dataset.s]??'')};
+  $('#bkExp').onclick=()=>{
+    const blob=new Blob([JSON.stringify({app:'grformela',ver:APP_VER,farmId:S.farmId,exported:nowISO(),farm:S.farm},null,1)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`grformela_${todayISO()}.json`;a.click();
+  };
+  $('#bkImp').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async()=>{
+    try{const d=JSON.parse(r.result);if(d.app!=='grformela'||!d.farm)throw new Error('To nie jest kopia z aplikacji GR Formela');
+      if(!confirm(`Wczytać kopię z ${fDate((d.exported||'').slice(0,10))}? Krowy i próbne doje z kopii zostaną dopisane lub nadpisane.`))return;
+      const ok=await commit({cows:Object.values(d.farm.cows||{}),moves:(d.farm.moves||[]).map(m=>({...m,id:m.id||(m.at.replace(/\D/g,'')+'-'+m.kolczyk)})),meta:{settings:{...DEF_SETTINGS,...d.farm.settings}}});
+      if(ok){for(const t of Object.values(d.farm.tests||{}))await commit({test:t});await openFarm(S.farmId);toast('Wczytano kopię')}
+    }catch(err){toast('Błąd kopii: '+err.message,5000)}};r.readAsText(f)};
+}
+
+/* ================== SERVICE WORKER ================== */
+if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+boot();
+</script>
+</body>
+</html>
