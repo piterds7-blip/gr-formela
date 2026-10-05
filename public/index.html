@@ -84,6 +84,12 @@ label.f input,label.f select{color:var(--c-txt);font-size:15px}
 .coltabs{display:none;gap:6px;overflow-x:auto;margin-bottom:10px}
 .coltabs button{border:1px solid var(--c-brd);background:#fff;border-radius:18px;padding:6px 12px;font-weight:600;white-space:nowrap}
 .coltabs button.on{background:var(--c-txt);color:#fff;border-color:var(--c-txt)}
+.coltabs button.drop,.col.drop{outline:3px dashed var(--c-pri);outline-offset:-3px;background:var(--c-pri-l);color:var(--c-txt)}
+.cow{-webkit-touch-callout:none}
+.cow.dragging{opacity:.35}
+#dragGhost{position:fixed;z-index:70;pointer-events:none;width:240px;transform:translate(-50%,28px);box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:.95}
+.drag-hint{display:none;font-size:12px;color:var(--c-txt2);margin:-4px 0 8px}
+#sortSel{padding:8px 10px}
 .board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start}
 .col{background:#EEF1EC;border-radius:var(--radius);padding:8px;min-height:200px;border-top:5px solid var(--brak)}
 .col[data-g=g1]{border-top-color:var(--g1)}.col[data-g=g2]{border-top-color:var(--g2)}.col[data-g=zas]{border-top-color:var(--zas)}
@@ -155,7 +161,10 @@ tbody tr:hover{background:#F7FAF6;cursor:pointer}
   main{padding:12px 10px 90px}
   .board{grid-template-columns:1fr}
   .board .col{display:none}.board .col.mob{display:block}
-  .coltabs{display:flex}
+  .coltabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;position:sticky;top:var(--hdrH,48px);z-index:20;background:var(--c-bg);padding:6px 0;margin-bottom:6px;overflow:visible}
+  .coltabs button{display:flex;flex-direction:column;align-items:center;line-height:1.15;padding:6px 2px;border-radius:10px;font-size:13px}
+  .coltabs button b{font-size:17px}
+  .drag-hint{display:block}
   input[type=search]{width:100%}
   .sug{grid-template-columns:24px 48px 1fr;}
   .sug .acts{grid-column:2/4}
@@ -201,7 +210,7 @@ const firebaseConfig={
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.2.0';
+const APP_VER='0.3.0';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
@@ -312,9 +321,10 @@ const LocalStore={
   async listFarms(){const d=this._d();return Object.entries(d.farms).map(([id,f])=>({id,name:f.name}))},
   async createFarm(id,name){const d=this._d();d.farms[id]={name,settings:{...DEF_SETTINGS},cows:{},moves:[],tests:{}};this._w(d)},
   async loadFarm(id){const f=this._d().farms[id];return f?{name:f.name,settings:{...DEF_SETTINGS,...f.settings},cows:f.cows||{},moves:f.moves||[],tests:f.tests||{}}:null},
-  async commit(id,{cows=[],moves=[],test=null,meta=null,delTest=null}){
+  async commit(id,{cows=[],patches=[],moves=[],test=null,meta=null,delTest=null}){
     const d=this._d();const f=d.farms[id];if(!f)throw new Error('Brak gospodarstwa');
     cows.forEach(c=>f.cows[c.kolczyk]=clean(c));
+    patches.forEach(p=>f.cows[p.k]={...(f.cows[p.k]||{kolczyk:p.k}),...clean(p.f)});
     moves.forEach(m=>f.moves.unshift(clean(m)));f.moves=f.moves.slice(0,5000);
     if(test)f.tests[test.date]=clean(test);
     if(delTest)delete f.tests[delTest];
@@ -334,10 +344,12 @@ const FireStore={
     const tests={};ts.forEach(d=>tests[d.id]=d.data());
     return{name:f.data().name,settings:{...DEF_SETTINGS,...(f.data().settings||{})},cows,moves:ms.docs.map(d=>d.data()),tests};
   },
-  async commit(id,{cows=[],moves=[],test=null,meta=null,delTest=null}){
+  async commit(id,{cows=[],patches=[],moves=[],test=null,meta=null,delTest=null}){
     const fr=db.collection('farms').doc(id);
     const ops=[];
     cows.forEach(c=>ops.push(b=>b.set(fr.collection('cows').doc(c.kolczyk),clean(c))));
+    // zapis tylko zmienionych pól krowy (merge) – nie nadpisuje zmian z innego urządzenia
+    patches.forEach(p=>ops.push(b=>b.set(fr.collection('cows').doc(p.k),clean(p.f),{merge:true})));
     moves.forEach(m=>ops.push(b=>b.set(fr.collection('moves').doc(m.id),clean(m))));
     if(test)ops.push(b=>b.set(fr.collection('tests').doc(test.date),clean(test)));
     if(delTest)ops.push(b=>b.delete(fr.collection('tests').doc(delTest)));
@@ -348,7 +360,7 @@ const FireStore={
 const Store=LOCAL?LocalStore:FireStore;
 
 /* ================== STAN ================== */
-const S={farms:[],farmId:null,farm:null,tab:'grupy',mobCol:'g1',q:'',selMode:false,sel:new Set(),sugOpen:true,
+const S={sortBy:localStorage.getItem('grformela.sortBy')||'dim_desc',farms:[],farmId:null,farm:null,tab:'grupy',mobCol:'g1',q:'',selMode:false,sel:new Set(),sugOpen:true,
   stadoG:'all',stadoSort:{k:'nr',d:1},pdDate:null,pending:null,charts:[]};
 
 async function commit(payload){
@@ -391,18 +403,19 @@ function suggestion(c){
   }
   return null;
 }
+function applyPatches(ps){ps.forEach(p=>{S.farm.cows[p.k]={...(S.farm.cows[p.k]||{kolczyk:p.k}),...p.f}})}
 async function moveCows(list,to,why=''){
-  const at=nowISO();const cows=[],moves=[];
+  const at=nowISO();const patches=[],moves=[],moved=[];
   list.forEach(c=>{
     const from=gOf(c);if(from===to)return;
-    const nc={...c,grupa:to==='brak'?null:to,grupaOd:at,updatedAt:at};
-    cows.push(nc);
+    patches.push({k:c.kolczyk,f:{grupa:to==='brak'?null:to,grupaOd:at,updatedAt:at}});
     moves.push({id:at.replace(/\D/g,'')+'-'+c.kolczyk,kolczyk:c.kolczyk,nr:c.nr??null,z:from,na:to,at,powod:why||''});
+    moved.push(c);
   });
-  if(!cows.length)return;
-  if(await commit({cows,moves})){
-    cows.forEach(c=>S.farm.cows[c.kolczyk]=c);S.farm.moves.unshift(...moves.reverse());
-    toast(cows.length===1?`Krowa ${cows[0].nr??''} → ${GR[to].n}`:`Przeniesiono ${cows.length} krów → ${GR[to].n}`);
+  if(!patches.length)return;
+  if(await commit({patches,moves})){
+    applyPatches(patches);S.farm.moves.unshift(...moves.reverse());
+    toast(moved.length===1?`Krowa ${moved[0].nr??''} → ${GR[to].n}`:`Przeniesiono ${moved.length} krów → ${GR[to].n}`);
     render();
   }
 }
@@ -452,10 +465,17 @@ function matchQ(c){
   const q=S.q.trim().toLowerCase();if(!q)return true;
   return String(c.nr??'').startsWith(q)||(c.nazwa||'').toLowerCase().includes(q)||c.kolczyk.toLowerCase().endsWith(q)||String(c.responder||'').endsWith(q);
 }
+const SORTS={dim_desc:'Dni laktacji ↓',dim_asc:'Dni laktacji ↑',kg_desc:'Litry ↓',kg_asc:'Litry ↑',nr_asc:'Numer ↑'};
 function sortCol(g,a,b){
-  if(g==='zas')return(planWyc(a)||'9999').localeCompare(planWyc(b)||'9999')||(a.nr??1e9)-(b.nr??1e9);
-  if(g==='brak')return(a.nr??1e9)-(b.nr??1e9);
-  return(dim(b)??-1)-(dim(a)??-1);
+  const nr=(a.nr??1e9)-(b.nr??1e9);
+  const num=(x,y,dir)=>{if(x==null&&y==null)return nr;if(x==null)return 1;if(y==null)return -1;return(x-y)*dir||nr};
+  switch(S.sortBy){
+    case'dim_asc':return num(dim(a),dim(b),1);
+    case'kg_desc':return num(a.ostPd?.kg,b.ostPd?.kg,-1);
+    case'kg_asc':return num(a.ostPd?.kg,b.ostPd?.kg,1);
+    case'nr_asc':return nr;
+    default:return num(dim(a),dim(b),-1);
+  }
 }
 function cowCard(c){
   const g=gOf(c),d=dim(c),sg=suggestion(c);
@@ -493,10 +513,13 @@ function renderGrupy(){
   <div class="board-bar no-print">
     <input type="search" id="q" placeholder="Szukaj: nr, nazwa, końcówka kolczyka" value="${esc(S.q)}">
     <button class="btn${S.selMode?' pri':''}" id="selModeBtn">${S.selMode?'Zakończ zaznaczanie':'Zaznacz kilka'}</button>
+    <button class="btn" id="addCowBtn">+ Dodaj sztukę</button>
+    <select id="sortSel" aria-label="Sortowanie">${Object.entries(SORTS).map(([k,v])=>`<option value="${k}"${S.sortBy===k?' selected':''}>Sortuj: ${v}</option>`).join('')}</select>
     <span class="spacer"></span>
     <button class="btn" id="printBtn">Drukuj listę grup</button>
   </div>
-  <div class="coltabs no-print">${GORDER.map(g=>`<button data-mc="${g}" class="${S.mobCol===g?'on':''}">${GR[g].n} ${cnt[g]}</button>`).join('')}</div>
+  <div class="coltabs no-print">${GORDER.map(g=>`<button data-mc="${g}" class="${S.mobCol===g?'on':''}"><span>${{brak:'Brak',g1:'Grupa 1',g2:'Grupa 2',zas:'Zasusz.'}[g]}</span><b>${cnt[g]}</b></button>`).join('')}</div>
+  <div class="drag-hint no-print">Przytrzymaj krowę i przeciągnij ją na nazwę grupy powyżej.</div>
   <div class="board" id="board">${GORDER.map(colHtml).join('')}</div>`;
   bindGrupy();
 }
@@ -504,6 +527,8 @@ function bindGrupy(){
   const q=$('#q');q.oninput=()=>{S.q=q.value;const pos=q.selectionStart;renderGrupy();const n=$('#q');n.focus();n.setSelectionRange(pos,pos)};
   $('#selModeBtn').onclick=()=>{S.selMode=!S.selMode;S.sel.clear();render()};
   $('#printBtn').onclick=printGroups;
+  $('#sortSel').onchange=e=>{S.sortBy=e.target.value;localStorage.setItem('grformela.sortBy',S.sortBy);renderGrupy()};
+  $('#addCowBtn').onclick=addCowDialog;
   document.querySelectorAll('[data-mc]').forEach(b=>b.onclick=()=>{S.mobCol=b.dataset.mc;renderGrupy()});
   document.querySelectorAll('[data-selall]').forEach(b=>b.onclick=()=>{
     const g=b.dataset.selall;activeCows().filter(c=>gOf(c)===g&&matchQ(c)).forEach(c=>S.sel.add(c.kolczyk));render()});
@@ -517,11 +542,12 @@ function bindGrupy(){
   };
   document.querySelectorAll('[data-sugmove]').forEach(b=>b.onclick=()=>{const c=S.farm.cows[b.dataset.sugmove];const s=suggestion(c);if(s)moveCows([c],s.to,s.why)});
   document.querySelectorAll('[data-sugskip]').forEach(b=>b.onclick=async()=>{
-    const c={...S.farm.cows[b.dataset.sugskip],pin:{do:addDays(todayISO(),14),powod:'pominięta podpowiedź'},updatedAt:nowISO()};
-    if(await commit({cows:[c]})){S.farm.cows[c.kolczyk]=c;toast(`Krowa ${c.nr??''}: podpowiedź ukryta na 14 dni`);render()}
+    const k=b.dataset.sugskip,c=S.farm.cows[k],f={pin:{do:addDays(todayISO(),14),powod:'pominięta podpowiedź'},updatedAt:nowISO()};
+    if(await commit({patches:[{k,f}]})){applyPatches([{k,f}]);toast(`Krowa ${c.nr??''}: podpowiedź ukryta na 14 dni`);render()}
   });
   const board=$('#board');
   board.onclick=e=>{
+    if(Date.now()<(S.noClickUntil||0))return;
     const el=e.target.closest('.cow');if(!el)return;const k=el.dataset.k;
     if(S.selMode){S.sel.has(k)?S.sel.delete(k):S.sel.add(k);el.classList.toggle('sel');renderSelBar()}
     else cowSheet(k);
@@ -532,6 +558,80 @@ function bindGrupy(){
     col.addEventListener('dragleave',e=>{if(!col.contains(e.relatedTarget))col.classList.remove('drop')});
     col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('drop');const k=e.dataTransfer.getData('text/plain');const c=S.farm.cows[k];if(c)moveCows([c],col.dataset.g,'ręcznie')});
   });
+  bindTouchDrag(board);
+}
+/* przeciąganie palcem (telefon/tablet): przytrzymaj ~0,35 s, przeciągnij na nazwę grupy lub kolumnę */
+function bindTouchDrag(board){
+  let timer=null,start=null,card=null,ghost=null,target=null,dragging=false;
+  const findTarget=(x,y)=>{const el=document.elementFromPoint(x,y);return el&&el.closest('[data-mc],.col')};
+  const clear=()=>{clearTimeout(timer);timer=null;
+    if(ghost)ghost.remove();ghost=null;if(card)card.classList.remove('dragging');
+    document.querySelectorAll('.drop').forEach(x=>x.classList.remove('drop'));
+    dragging=false;card=null;target=null};
+  board.addEventListener('contextmenu',e=>{if(e.target.closest('.cow'))e.preventDefault()});
+  board.addEventListener('touchstart',e=>{
+    if(S.selMode||e.touches.length!==1)return;
+    const el=e.target.closest('.cow');if(!el)return;
+    const t0=e.touches[0];start={x:t0.clientX,y:t0.clientY};card=el;
+    timer=setTimeout(()=>{
+      dragging=true;card.classList.add('dragging');
+      ghost=card.cloneNode(true);ghost.id='dragGhost';ghost.classList.remove('dragging');
+      ghost.style.left=start.x+'px';ghost.style.top=start.y+'px';document.body.appendChild(ghost);
+      if(navigator.vibrate)try{navigator.vibrate(25)}catch(_){}
+    },350);
+  },{passive:true});
+  board.addEventListener('touchmove',e=>{
+    const t1=e.touches[0];
+    if(!dragging){if(start&&Math.hypot(t1.clientX-start.x,t1.clientY-start.y)>8){clearTimeout(timer);timer=null;card=null}return}
+    e.preventDefault();
+    ghost.style.left=t1.clientX+'px';ghost.style.top=t1.clientY+'px';
+    const tg=findTarget(t1.clientX,t1.clientY);
+    if(tg!==target){if(target)target.classList.remove('drop');target=tg;if(target)target.classList.add('drop')}
+  },{passive:false});
+  const end=()=>{
+    if(dragging){
+      S.noClickUntil=Date.now()+500;
+      const k=card&&card.dataset.k,g=target&&(target.dataset.mc||target.dataset.g);
+      clear();
+      const c=k&&S.farm.cows[k];
+      if(c&&g&&g!==gOf(c)){S.mobCol=g;moveCows([c],g,'ręcznie (przeciągnięcie)')}
+    }else clear();
+  };
+  board.addEventListener('touchend',end);board.addEventListener('touchcancel',clear);
+}
+/* dodanie sztuki spoza listy (np. wycielona jałówka, której nie ma jeszcze w próbnym doju) */
+function addCowDialog(){
+  openModal(`<h3>Dodaj sztukę</h3>
+  <p class="muted" style="margin-top:-4px">Np. jałówka po wycieleniu, której nie ma jeszcze w pliku z próbnego doju. Przy kolejnym imporcie zostanie dopasowana po kolczyku.</p>
+  <div class="grid2">
+    <label class="f">Numer oborowy *<input type="number" id="acNr" min="1"></label>
+    <label class="f">Kolczyk *<input type="text" id="acKol" placeholder="PL005..." autocapitalize="characters"></label>
+    <label class="f">Nazwa<input type="text" id="acNaz"></label>
+    <label class="f">Nr laktacji<input type="number" id="acLakt" min="1" value="1"></label>
+    <label class="f">Data wycielenia<input type="date" id="acWyc" value="${todayISO()}"></label>
+    <label class="f">Grupa<select id="acGr">${['g1','g2','zas','brak'].map(g=>`<option value="${g}"${g==='g1'?' selected':''}>${GR[g].n}</option>`).join('')}</select></label>
+  </div>
+  <p id="acErr" class="bad" style="min-height:1em;margin:8px 0 0"></p>
+  <div class="row" style="margin-top:8px"><span class="spacer"></span><button class="btn" data-close>Anuluj</button><button class="btn pri" id="acSave">Dodaj</button></div>`);
+  $('#acNr').focus();
+  $('#acSave').onclick=async()=>{
+    const err=m=>{$('#acErr').textContent=m};
+    const nr=parseInt($('#acNr').value,10);
+    const kol=$('#acKol').value.replace(/\s/g,'').toUpperCase();
+    if(!nr)return err('Podaj numer oborowy.');
+    if(!/^[A-Z]{2}\d{6,}$/.test(kol))return err('Kolczyk w formacie PL i cyfry, np. PL005432385862.');
+    const ex=S.farm.cows[kol];
+    if(ex&&ex.aktywna!==false)return err(`Ta sztuka już jest w stadzie (nr ${ex.nr??'?'}). Otwórz jej kartę, żeby wpisać wycielenie.`);
+    const dup=activeCows().find(c=>c.nr===nr);
+    if(dup&&!confirm(`Numer ${nr} ma już krowa ${dup.nazwa||dup.kolczyk}. Dodać mimo to?`))return;
+    const at=nowISO(),g=$('#acGr').value;
+    const f={kolczyk:kol,nr,nazwa:$('#acNaz').value.trim(),lakt:parseInt($('#acLakt').value,10)||1,dataWyc:$('#acWyc').value||null,
+      grupa:g==='brak'?null:g,grupaOd:at,aktywna:true,createdAt:ex?.createdAt||at,updatedAt:at,dodanaRecznie:true};
+    const mv={id:at.replace(/\D/g,'')+'-'+kol,kolczyk:kol,nr,z:'brak',na:g,at,powod:'dodana ręcznie'};
+    if(await commit({patches:[{k:kol,f}],moves:[mv]})){
+      applyPatches([{k:kol,f}]);S.farm.moves.unshift(mv);S.mobCol=g;closeModal();toast(`Dodano krowę ${nr} → ${GR[g].n}`);render();
+    }
+  };
 }
 window.goTab=t=>{document.querySelector(`#tabs button[data-t="${t}"]`).click()};
 function renderSelBar(){
@@ -560,6 +660,9 @@ function cowSheet(k){
   <label class="f" style="margin-top:10px">Powód przypięcia / notatka<input type="text" id="csNote" value="${esc((c.pin&&c.pin.powod)||c.notatka||'')}"></label>
   <label class="row" style="margin-top:10px;font-size:14px"><input type="checkbox" id="csAkt" ${c.aktywna===false?'checked':''}> Usunięta ze stada (ukryj)</label>
   <div class="row" style="margin-top:12px"><span class="spacer"></span><button class="btn pri" id="csSave">Zapisz</button></div>
+  <h3 style="margin-top:16px">Wycielenie</h3>
+  <div class="row"><input type="date" id="csWyc" value="${todayISO()}"><button class="btn" id="csWycBtn">Zapisz wycielenie → Grupa 1</button></div>
+  <p class="muted" style="margin:4px 0 0">Ustawia nową datę wycielenia, podnosi numer laktacji o 1 i przenosi krowę do grupy 1.</p>
   <h3 style="margin-top:16px">Próbne doje</h3>
   ${pds.length?`<div class="tbl-wrap"><table><thead><tr><th>Data</th><th class="n">DIM</th><th class="n">kg</th><th class="n">tł</th><th class="n">bi</th><th class="n">T/B</th><th class="n">mocz.</th><th class="n">LKS</th></tr></thead><tbody>
   ${pds.map(({date,r})=>`<tr><td>${fDate(date)}</td><td class="n">${r.dimPd??'–'}</td><td class="n">${fNum(r.kg)}</td><td class="n">${fNum(r.tl,2)}</td><td class="n">${fNum(r.bi,2)}</td><td class="n">${fNum(r.tb,2)}</td><td class="n">${fNum(r.moc,0)}</td><td class="n ${r.lks>S.farm.settings.lksProg?'bad':''}">${fNum(r.lks,0)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Brak.</p>'}
@@ -568,8 +671,16 @@ function cowSheet(k){
   document.querySelectorAll('[data-mv]').forEach(b=>b.onclick=async()=>{closeModal();await moveCows([c],b.dataset.mv,'ręcznie')});
   $('#csSave').onclick=async()=>{
     const pinDo=$('#csPin').value,note=$('#csNote').value.trim();
-    const nc={...c,plWyc:$('#csPw').value||null,pin:pinDo?{do:pinDo,powod:note}:null,notatka:pinDo?(c.notatka||''):note,aktywna:!$('#csAkt').checked,updatedAt:nowISO()};
-    if(await commit({cows:[nc]})){S.farm.cows[k]=nc;closeModal();toast('Zapisano');render()}
+    const f={plWyc:$('#csPw').value||null,pin:pinDo?{do:pinDo,powod:note}:null,notatka:pinDo?(c.notatka||''):note,aktywna:!$('#csAkt').checked,updatedAt:nowISO()};
+    if(await commit({patches:[{k,f}]})){applyPatches([{k,f}]);closeModal();toast('Zapisano');render()}
+  };
+  $('#csWycBtn').onclick=async()=>{
+    const dw=$('#csWyc').value;if(!dw)return toast('Wybierz datę wycielenia');
+    if(c.dataWyc&&dw<=c.dataWyc)return toast(`Data musi być późniejsza niż ostatnie wycielenie (${fDate(c.dataWyc)})`,4000);
+    const at=nowISO();
+    const f={dataWyc:dw,lakt:(c.lakt||0)+1,plWyc:null,pin:null,grupa:'g1',grupaOd:at,updatedAt:at};
+    const mv={id:at.replace(/\D/g,'')+'-'+k,kolczyk:k,nr:c.nr??null,z:gOf(c),na:'g1',at,powod:`wycielenie ${fDate(dw)}`};
+    if(await commit({patches:[{k,f}],moves:[mv]})){applyPatches([{k,f}]);S.farm.moves.unshift(mv);S.mobCol='g1';closeModal();toast(`Krowa ${c.nr??''}: wycielenie ${fDate(dw)}, grupa 1`);render()}
   };
 }
 function printGroups(){
@@ -695,19 +806,22 @@ function showPreview(){
     <div class="row"><span class="spacer"></span><button class="btn" id="pdCancel">Anuluj</button><button class="btn pri" id="pdSave">Zapisz próbny dój</button></div></div>`;
   $('#pdCancel').onclick=()=>{S.pending=null;$('#pdPreview').innerHTML=''};
   $('#pdSave').onclick=async()=>{
-    const at=nowISO(),upd=[];
+    // Import zapisuje TYLKO pola z pliku. Grupa, przypięcie, notatki i planowane wycielenie zostają nietknięte.
+    const at=nowISO(),patches=[];
     p.rows.forEach(r=>{
-      const c=cows[r.kolczyk]||{kolczyk:r.kolczyk,grupa:null,createdAt:at};
-      const nc={...c,nr:r.nr??c.nr??null,nazwa:r.nazwa||c.nazwa||'',lakt:r.lakt??c.lakt??null,aktywna:true,updatedAt:at};
-      if(r.dataWyc&&(!c.dataWyc||r.dataWyc>=c.dataWyc))nc.dataWyc=r.dataWyc;
-      if(!c.ostPd||p.testDate>=c.ostPd.date)nc.ostPd={date:p.testDate,kg:r.kg,tl:r.tl,bi:r.bi,tb:r.tb,moc:r.moc,lks:r.lks,sket:r.sket,info:r.info};
-      upd.push(nc);
+      const c=cows[r.kolczyk];
+      const f={nr:r.nr??c?.nr??null,nazwa:r.nazwa||c?.nazwa||'',aktywna:true,updatedAt:at};
+      if(!c){f.kolczyk=r.kolczyk;f.grupa=null;f.createdAt=at}
+      // wycielenie i laktacja z pliku tylko, gdy nie są starsze niż wpisane ręcznie
+      if(!c||!c.dataWyc||(r.dataWyc&&r.dataWyc>=c.dataWyc)){if(r.dataWyc)f.dataWyc=r.dataWyc;if(r.lakt!=null)f.lakt=r.lakt}
+      if(!c||!c.ostPd||p.testDate>=c.ostPd.date)f.ostPd={date:p.testDate,kg:r.kg,tl:r.tl,bi:r.bi,tb:r.tb,moc:r.moc,lks:r.lks,sket:r.sket,info:r.info};
+      patches.push({k:r.kolczyk,f});
     });
-    if($('#markGone')&&$('#markGone').checked)absent.forEach(c=>upd.push({...c,aktywna:false,updatedAt:at}));
+    if($('#markGone')&&$('#markGone').checked)absent.forEach(c=>patches.push({k:c.kolczyk,f:{aktywna:false,updatedAt:at}}));
     const test={date:p.testDate,fileName:p.fileName||'',importedAt:at,owner:p.owner||'',rows:p.rows};
     $('#pdSave').disabled=true;
-    if(await commit({cows:upd,test})){
-      upd.forEach(c=>S.farm.cows[c.kolczyk]=c);S.farm.tests[test.date]=test;S.pdDate=test.date;S.pending=null;
+    if(await commit({patches,test})){
+      applyPatches(patches);S.farm.tests[test.date]=test;S.pdDate=test.date;S.pending=null;
       toast(`Zapisano próbny dój z ${fDate(test.date)}: ${p.rows.length} krów`);render();
     }else $('#pdSave').disabled=false;
   };
@@ -842,6 +956,9 @@ async function maybeInstallBar(){
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;maybeInstallBar()});
 window.addEventListener('appinstalled',()=>{deferredInstall=null;removeInstallBar();toast('Zainstalowano. Otwórz GR Formela z ikony na ekranie głównym.',5000)});
 maybeInstallBar();
+
+const setHdrH=()=>document.documentElement.style.setProperty('--hdrH',(document.querySelector('header').offsetHeight||48)+'px');
+setHdrH();window.addEventListener('resize',setHdrH);
 
 /* ================== SERVICE WORKER ================== */
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
