@@ -210,7 +210,7 @@ const firebaseConfig={
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.3.0';
+const APP_VER='0.4.0';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
@@ -897,7 +897,14 @@ function renderUst(){
     <div class="row" style="margin-top:14px"><span class="spacer"></span><button class="btn" id="defBtn">Przywróć domyślne</button><button class="btn pri" id="saveSet">Zapisz ustawienia</button></div></div>
   <div class="card"><h2>Dane</h2><p class="muted">${LOCAL?'<b>Tryb lokalny:</b> dane są tylko w tej przeglądarce. Po podłączeniu Firebase zaimportuj kopię, żeby je przenieść.':'Dane zapisują się w Firebase i są dostępne na każdym urządzeniu po zalogowaniu.'}</p>
     <div class="row"><button class="btn" id="bkExp">Pobierz kopię (JSON)</button><label class="btn">Wczytaj kopię<input type="file" id="bkImp" accept=".json" hidden></label></div>
-    <p class="muted" style="margin-top:12px">GR Formela, wersja ${APP_VER}</p></div>`;
+    <p class="muted" style="margin-top:12px">GR Formela, wersja ${APP_VER}</p></div>
+  <div class="card"><h2>Dane z Infodexu</h2>
+    <p class="muted">Wczytaj plik <b>infodex_export.json</b> zrobiony na komputerze w gospodarstwie (EKSPORT.bat). Dane z pliku trafiają do bazy, grupy ani notatki nie są ruszane.</p>
+    <p class="muted" id="ixStatus">${LOCAL?'Wymaga podłączonego Firebase.':'Sprawdzam ostatnią aktualizację…'}</p>
+    <div class="row"><label class="btn pri">Wczytaj plik z Infodexu<input type="file" id="ixFile" accept=".json" hidden></label></div>
+    <div id="ixProg" class="muted" style="margin-top:8px"></div></div>`;
+  if(!LOCAL)ixShowStatus();
+  $('#ixFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)ixImport(f)};
   $('#saveSet').onclick=async()=>{
     const ns={...s};document.querySelectorAll('[data-s]').forEach(i=>{const v=i.value.trim();ns[i.dataset.s]=v===''?null:Number(v)});
     ['dimG1G2','dniZasuszenia','ciaza','mocMin','mocMax','biMin','biMax','tbKetoza','tbSara','dimSwieze','lksProg'].forEach(k=>{if(ns[k]===null||isNaN(ns[k]))ns[k]=DEF_SETTINGS[k]});
@@ -914,6 +921,49 @@ function renderUst(){
       const ok=await commit({cows:Object.values(d.farm.cows||{}),moves:(d.farm.moves||[]).map(m=>({...m,id:m.id||(m.at.replace(/\D/g,'')+'-'+m.kolczyk)})),meta:{settings:{...DEF_SETTINGS,...d.farm.settings}}});
       if(ok){for(const t of Object.values(d.farm.tests||{}))await commit({test:t});await openFarm(S.farmId);toast('Wczytano kopię')}
     }catch(err){toast('Błąd kopii: '+err.message,5000)}};r.readAsText(f)};
+}
+
+
+/* ================== DANE Z INFODEXU (plik z komputera w gospodarstwie) ================== */
+async function ixShowStatus(){
+  const el=$('#ixStatus');if(!el)return;
+  try{
+    const m=await db.collection('farms').doc(S.farmId).collection('ix').doc('meta').get();
+    if(!m.exists){el.textContent='Jeszcze nic nie wczytano.';return}
+    const d=m.data();
+    el.innerHTML=`Ostatnia aktualizacja: <b>${esc(d.at||'?')}</b>${d.first?`, dane od <b>${esc(d.first)}</b> do <b>${esc(d.last||'?')}</b>`:''}${d.via==='plik'?' (z pliku)':''}.`;
+  }catch(e){el.textContent='Nie udało się sprawdzić ostatniej aktualizacji: '+e.message}
+}
+async function ixImport(file){
+  const prog=$('#ixProg');const say=t=>{if(prog)prog.textContent=t};
+  if(LOCAL){toast('Wymaga podłączonego Firebase',4000);return}
+  try{
+    say('Czytam plik…');
+    const d=JSON.parse(await file.text());
+    if(d.app!=='grformela-infodex'||!d.herd||!d.days)throw new Error('To nie jest plik z agenta Infodex (infodex_export.json)');
+    const days=Object.keys(d.days).sort();
+    if(!confirm(`Wczytać dane z Infodexu?\n\nPlik z ${d.exported||'?'}\nDni: ${days.length} (${days[0]||'-'} → ${days[days.length-1]||'-'})\nKrowy: ${Object.keys(d.herd.cows||{}).length}, zdarzenia: ${(d.events&&d.events.list||[]).length}`)){say('');return}
+    const fr=db.collection('farms').doc(S.farmId);
+    let done=0;const total=days.length+3;
+    const CH=40;
+    for(let i=0;i<days.length;i+=CH){
+      const b=db.batch();
+      days.slice(i,i+CH).forEach(k=>b.set(fr.collection('ix_days').doc(k),d.days[k]));
+      await b.commit();done=Math.min(days.length,i+CH);
+      say(`Wysyłam dni: ${done} / ${days.length}…`);
+    }
+    say('Zapisuję stado i zdarzenia…');
+    await fr.collection('ix').doc('herd').set(d.herd);
+    await fr.collection('ix').doc('events').set(d.events||{at:d.exported,list:[]});
+    const meta={...(d.meta||{}),via:'plik',imported:nowISO()};
+    await fr.collection('ix').doc('meta').set(meta,{merge:true});
+    say(`Gotowe. Wczytano ${days.length} dni, ${Object.keys(d.herd.cows||{}).length} krów.`);
+    toast('Wczytano dane z Infodexu');
+    ixShowStatus();
+  }catch(err){
+    console.error(err);say('');
+    toast('Błąd wczytywania: '+(err.code==='permission-denied'?'brak uprawnień do bazy.':err.message),7000);
+  }
 }
 
 /* ================== INSTALACJA NA TELEFONIE ================== */
