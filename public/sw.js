@@ -1,4 +1,4 @@
-const CACHE_NAME='grformela-v8';
+const CACHE_NAME='grformela-v9';
 const ASSETS=['./index.html','./manifest.json','./icon-192.png','./icon-512.png','./icon-512-maskable.png','./apple-touch-icon.png','./favicon-32.png'];
 const CDN=[
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
