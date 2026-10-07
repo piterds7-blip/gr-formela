@@ -177,7 +177,7 @@ tbody tr:hover{background:#F7FAF6;cursor:pointer}
 
 
 /* Infodex: Dziś / Żywienie */
-.dsk{}.mob{display:none}
+.lbl-m{display:none}
 .fresh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid var(--c-brd);border-radius:var(--radius);padding:8px 12px;margin-bottom:12px;font-size:14px}
 .fresh.old{background:var(--c-gold-bg);border-color:#E3CC7A}
 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
@@ -216,7 +216,7 @@ tr.tot td{font-weight:700;background:#F7FAF6}
 .modal.wide{max-width:900px}
 details summary{cursor:pointer}
 @media(max-width:860px){
-  .dsk{display:none}.mob{display:inline}
+  .lbl-d{display:none}.lbl-m{display:inline}
   nav.tabs button{font-size:12px;padding:12px 2px}
   .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
   .tile b{font-size:22px}
@@ -241,8 +241,8 @@ details summary{cursor:pointer}
   <button data-t="grupy">Grupy</button>
   <button data-t="stado">Stado</button>
   <button data-t="zyw">Żywienie</button>
-  <button data-t="pd">Próbne<span class="dsk"> doje</span></button>
-  <button data-t="ust"><span class="dsk">Ustawienia</span><span class="mob">Ustaw.</span></button>
+  <button data-t="pd">Próbne<span class="lbl-d"> doje</span></button>
+  <button data-t="ust"><span class="lbl-d">Ustawienia</span><span class="lbl-m">Ustaw.</span></button>
 </nav>
 <main id="main"></main>
 <div id="modalRoot"></div>
@@ -261,7 +261,7 @@ const firebaseConfig={
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.5.0';
+const APP_VER='0.5.1';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
