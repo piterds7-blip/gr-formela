@@ -108,6 +108,30 @@ label.f input,label.f select{color:var(--c-txt);font-size:15px}
 .cow.sel{border-color:var(--c-pri);box-shadow:0 0 0 2px var(--c-pri) inset;background:var(--c-pri-l)}
 .cow.gone{opacity:.5}
 .pin{font-size:12px}
+:root{--lt-p:#2E8B3D;--lt-w:#2F6FB5;--lt-z:#C0392B;--st:#D9822B}
+.cow.lt-p{border-left:6px solid var(--lt-p)}.cow.lt-w{border-left:6px solid var(--lt-w)}.cow.lt-z{border-left:6px solid var(--lt-z)}
+.cow.lt-p .nr{color:var(--lt-p)}.cow.lt-w .nr{color:var(--lt-w)}.cow.lt-z .nr{color:var(--lt-z)}
+.stb{display:inline-block;margin-left:4px;vertical-align:3px;font-size:11px;font-weight:800;line-height:16px;min-width:16px;padding:0 3px;text-align:center;border-radius:4px;background:var(--st);color:#fff;cursor:help}
+.stb.bad{background:var(--c-red);color:#fff}
+.stb.off{background:#fff;color:var(--c-grey);border:1px solid var(--c-grey);text-decoration:line-through;line-height:14px}
+.fresh-b{background:var(--c-pri-l);color:var(--c-pri);font-weight:700;border-radius:4px;padding:0 5px}
+.lgd{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13px;margin:10px 2px 4px}
+.lg{display:inline-flex;align-items:center;gap:6px}.lg::before{content:"";width:6px;height:16px;border-radius:2px;background:var(--c-grey)}
+.lg.lt-p::before{background:var(--lt-p)}.lg.lt-w::before{background:var(--lt-w)}.lg.lt-z::before{background:var(--lt-z)}
+.ltd{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:1px;background:transparent}
+.ltd.lt-p{background:var(--lt-p)}.ltd.lt-w{background:var(--lt-w)}.ltd.lt-z{background:var(--lt-z)}
+.ltb{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;color:#fff}
+.ltb.lt-p{background:var(--lt-p)}.ltb.lt-w{background:var(--lt-w)}.ltb.lt-z{background:var(--lt-z)}
+.stwarn{border-color:#E6B8B2;background:var(--c-red-bg)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.u-r{color:var(--c-red);font-weight:700}.u-a{color:#9A7406;font-weight:700}.u-g{color:var(--c-pri);font-weight:700}
+.est{color:var(--c-txt2);font-style:italic}
+tr.tot td{font-weight:700;background:#F6F8F4}
+tr.wrong td{background:var(--c-red-bg)}
+.g1t td,.g1t th{white-space:nowrap}
+.g1t td:first-child{position:sticky;left:0;background:#fff}
+.g1t tr.wrong td:first-child{background:var(--c-red-bg)}
+.g1t th:first-child{position:sticky;left:0;z-index:2}
 .selbar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--c-nav);color:#fff;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px}
 .selbar .sb-top{display:flex;align-items:center;gap:8px}
 .selbar .sb-btns{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;max-width:760px}
@@ -261,7 +285,7 @@ const firebaseConfig={
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.5.1';
+const APP_VER='0.6.0';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
@@ -362,7 +386,8 @@ const chip=g=>`<span class="gchip g-${g}">${GR[g].s==='—'?'brak':GR[g].s}</spa
 const DEF_SETTINGS={
   dimG1G2:200,dimG1G2Pierw:null,dniZasuszenia:60,ciaza:282,
   mocMin:150,mocMax:250,biMin:3.2,biMax:3.6,tbKetoza:1.5,tbSara:1.0,dimSwieze:100,lksProg:400,
-  kodCiazy:1,vwp:60,badanieCiazyOd:30,alertMleko:20,alertRum:25,zmianaPomin:3,tmrMleko:25,kgPaszyNaKgMleka:0.4,cenaPaszy:1.6,lat:54.53,lon:17.7
+  kodCiazy:1,vwp:60,badanieCiazyOd:30,alertMleko:20,alertRum:25,zmianaPomin:3,tmrMleko:25,kgPaszyNaKgMleka:0.4,cenaPaszy:1.6,lat:54.53,lon:17.7,
+  limitZolty:85,limitCzerwony:70
 };
 
 /* ================== MAGAZYN DANYCH ================== */
@@ -421,41 +446,74 @@ async function commit(payload){
 }
 
 /* ================== REGUŁY GRUP ================== */
-function dim(c){if(!c.dataWyc)return null;return dayDiff(c.dataWyc,todayISO())}
+/* Laktacja krowy: Infodex ma pierwszeństwo, bo próbny dój (SOL) jest raz w miesiącu.
+   Wpis ręczny (przycisk „Zapisz wycielenie”) wygrywa, gdy jest nowszy niż dane z Infodexu. */
+const LACC=new Map();
+function lac(c){
+  if(LACC.has(c.kolczyk))return LACC.get(c.kolczyk);
+  let r={lakt:c.lakt??null,dataWyc:c.dataWyc||null,zas:null,src:'sol',fresh:false,id:null};
+  const id=ixHas()&&IXL?IXL.app2ix[c.kolczyk]:null;
+  if(id){
+    r.id=id;
+    const x=ixLacId(id);
+    if(x&&x.cd){
+      const manualNewer=c.dataWyc&&c.dataWyc>addDays(x.cd,20);
+      if(manualNewer)r.zas=false;
+      else{
+        // numer laktacji: z próbnego doju + wycielenia zapisane w Infodexie po nim (licznik Infodexu zna tylko wycielenia od instalacji)
+        let lk=c.lakt!=null?c.lakt+x.calvs.filter(d=>!c.dataWyc||d>addDays(c.dataWyc,30)).length:null;
+        lk=Math.max(lk||0,x.calv||0)||null;
+        const fresh=(!c.dataWyc||x.cd>addDays(c.dataWyc,30))&&(!c.ostPd||x.cd>c.ostPd.date);
+        r={lakt:lk,dataWyc:x.cd,zas:x.dry,src:'ix',fresh,id};
+      }
+    }
+  }
+  r.dim=r.dataWyc?dayDiff(r.dataWyc,todayISO()):null;
+  LACC.set(c.kolczyk,r);return r;
+}
+/* typ krowy do kolorów: p = pierwiastka, w = wieloródka, z = zasuszona */
+function lacType(c){const L=lac(c);if(L.zas||(L.src!=='ix'&&gOf(c)==='zas'))return 'z';if(L.lakt===1)return 'p';if(L.lakt>=2)return 'w';return ''}
+const LTN={p:'pierwiastka',w:'wieloródka',z:'zasuszona'};
+function dim(c){return lac(c).dim}
 function pinned(c){return c.pin&&(!c.pin.do||c.pin.do>=todayISO())}
-function progG1(c){const s=S.farm.settings;return(c.lakt===1&&s.dimG1G2Pierw)?s.dimG1G2Pierw:s.dimG1G2}
+function progG1(c){const s=S.farm.settings;return(lac(c).lakt===1&&s.dimG1G2Pierw)?s.dimG1G2Pierw:s.dimG1G2}
 function planWyc(c){
   if(c.plWyc)return c.plWyc;
+  const L=lac(c);
+  if(L.id){const rp=ixRepro(L.id);if(rp.pregnant&&rp.expCalv)return rp.expCalv}
   return null;
 }
 function suggestion(c){
   if(c.aktywna===false||pinned(c))return null;
-  const s=S.farm.settings,g=gOf(c),d=dim(c),p=progG1(c);
+  const s=S.farm.settings,g=gOf(c),L=lac(c),d=L.dim,p=progG1(c);
   const info=(c.ostPd&&c.ostPd.info||'').toLowerCase();
-  const infoNew=c.ostPd&&(!c.grupaOd||c.ostPd.date>=c.grupaOd.slice(0,10));
-  const zasInfo=info.includes('zasusz');
-  const wycPoZmianie=c.dataWyc&&c.grupaOd&&c.dataWyc>c.grupaOd.slice(0,10);
+  const ix=L.src==='ix';
+  // stan „zasuszona”: z Infodexu (bieżący), a bez Infodexu z uwag próbnego doju
+  const zasInfo=ix?!!L.zas:info.includes('zasusz');
+  const infoNew=ix||(c.ostPd&&(!c.grupaOd||c.ostPd.date>=c.grupaOd.slice(0,10)));
+  const zasWhy=ix?'zasuszona w Infodexie':'w próbnym doju oznaczona jako zasuszona';
+  const wycPoZmianie=L.dataWyc&&c.grupaOd&&L.dataWyc>c.grupaOd.slice(0,10)&&!L.zas;
   const pw=planWyc(c);
   if(g==='brak'){
-    if(zasInfo)return{to:'zas',why:'w próbnym doju oznaczona jako zasuszona'};
+    if(zasInfo)return{to:'zas',why:zasWhy};
     if(d===null)return null;
     return d<p?{to:'g1',why:`dzień laktacji ${d} (próg ${p})`}:{to:'g2',why:`dzień laktacji ${d} (próg ${p})`};
   }
   if(g==='g1'){
-    if(zasInfo&&infoNew)return{to:'zas',why:'w próbnym doju oznaczona jako zasuszona'};
+    if(zasInfo&&infoNew)return{to:'zas',why:zasWhy};
     if(d!==null&&d>=p)return{to:'g2',why:`dzień laktacji ${d}, próg ${p}`};
   }
   if(g==='g2'){
-    if(wycPoZmianie)return{to:'g1',why:`wycielenie ${fDate(c.dataWyc)}`};
-    if(zasInfo&&infoNew)return{to:'zas',why:'w próbnym doju oznaczona jako zasuszona'};
-    if(pw){const left=dayDiff(todayISO(),pw);if(left<=s.dniZasuszenia)return{to:'zas',why:`do planowanego wycielenia ${left} dni`}}
+    if(wycPoZmianie)return{to:'g1',why:`wycielenie ${fDate(L.dataWyc)}`};
+    if(zasInfo&&infoNew)return{to:'zas',why:zasWhy};
+    if(pw){const left=dayDiff(todayISO(),pw);if(left<=s.dniZasuszenia)return{to:'zas',why:`do ${c.plWyc?'planowanego':'spodziewanego'} wycielenia ${left} dni`}}
   }
   if(g==='zas'){
-    if(wycPoZmianie)return{to:'g1',why:`wycielenie ${fDate(c.dataWyc)}`};
+    if(wycPoZmianie)return{to:'g1',why:`wycielenie ${fDate(L.dataWyc)}`};
   }
   return null;
 }
-function applyPatches(ps){ps.forEach(p=>{S.farm.cows[p.k]={...(S.farm.cows[p.k]||{kolczyk:p.k}),...p.f}})}
+function applyPatches(ps){LACC.clear();ps.forEach(p=>{S.farm.cows[p.k]={...(S.farm.cows[p.k]||{kolczyk:p.k}),...p.f}})}
 async function moveCows(list,to,why=''){
   const at=nowISO();const patches=[],moves=[],moved=[];
   list.forEach(c=>{
@@ -501,6 +559,7 @@ $('#tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tab=b.d
 function render(){
   S.charts.forEach(c=>c.destroy());S.charts=[];
   if(!S.farm)return;
+  LACC.clear();if(ixHas())ixL();
   ({dzis:renderDzis,grupy:renderGrupy,stado:renderStado,zyw:renderZyw,pd:renderPD,ust:renderUst})[S.tab]();
   renderSelBar();
 }
@@ -525,24 +584,51 @@ function sortCol(g,a,b){
   const num=(x,y,dir)=>{if(x==null&&y==null)return nr;if(x==null)return 1;if(y==null)return -1;return(x-y)*dir||nr};
   switch(S.sortBy){
     case'dim_asc':return num(dim(a),dim(b),1);
-    case'kg_desc':return num(a.ostPd?.kg,b.ostPd?.kg,-1);
-    case'kg_asc':return num(a.ostPd?.kg,b.ostPd?.kg,1);
+    case'kg_desc':return num(kgOf(a),kgOf(b),-1);
+    case'kg_asc':return num(kgOf(a),kgOf(b),1);
     case'nr_asc':return nr;
     default:return num(dim(a),dim(b),-1);
   }
 }
-function cowCard(c){
-  const g=gOf(c),d=dim(c),sg=suggestion(c);
-  const over=g==='g1'&&d!==null&&d>=progG1(c);
-  let dimTxt=d===null?'':`${d} dni`;
-  if(g==='zas'){const pw=planWyc(c);dimTxt=pw?`wyc. za ${dayDiff(todayISO(),pw)} dni`:'zasuszona'}
-  const pd=c.ostPd;
-  const meta=[c.lakt?`lakt. ${c.lakt}`:'',pd&&pd.kg!=null?`${fNum(pd.kg)} kg`:'',pd&&pd.info?esc(pd.info):''].filter(Boolean).join(' · ');
-  return `<div class="cow${over?' over':''}${S.sel.has(c.kolczyk)?' sel':''}" data-k="${esc(c.kolczyk)}" ${!S.selMode?'draggable="true"':''}>
-    <span class="nr">${esc(c.nr??'?')}</span><span class="nm">${esc(c.nazwa||c.kolczyk)}</span>
-    <span class="dim">${dimTxt}</span>
-    <span class="meta">${meta}${pinned(c)?'<span class="pin" title="Przypięta">📌</span>':''}${sg?`<span class="hint">→ ${GR[sg.to].s}</span>`:''}</span></div>`;
+/* mleko do list: średnia 7 dni z Infodexu, a bez niego wynik próbnego doju */
+function kgOf(c){const L=lac(c);if(L.id){const v=ixMilk7(L.id);if(v!=null)return v}return c.ostPd?.kg??null}
+function ixMilk7(id){const D=IX.d,ser=D.ser[id]||{};const l=dRange(addDays(D.ref,-6),D.ref).map(d=>ser[d]&&ser[d].m).filter(x=>x>0);return l.length?avg(l):null}
+/* pobór paszy ze stacji (Infodex): on = pobiera (≥0,3 kg w ostatnich 2 dniach), none3 = 3 dni bez paszy, choć jest dojona */
+function stInfo(id){
+  const D=IX.d,R=D.ref,ser=D.ser[id]||{},rec=d=>ser[d]||{};
+  const f0=rec(R).f||0,f1=rec(addDays(R,-1)).f||0;
+  const last3=[0,1,2].map(i=>rec(addDays(R,-i)));
+  return{on:Math.max(f0,f1)>=300,y:f0/1000,y1:f1/1000,none3:last3.every(x=>!(x.f>0))&&last3.some(x=>x.m>0)};
 }
+const ixIssueOf=id=>IXL?IXL.issues.find(i=>i.id===id&&(i.t==='ear'||i.t==='nr')):null;
+function stBadge(c){
+  const L=lac(c);if(!L.id)return '';
+  const st=stInfo(L.id),g=gOf(c),iss=ixIssueOf(L.id);
+  const warn=iss?` UWAGA: ${iss.msg} Sprawdź, czy to na pewno ta krowa.`:'';
+  if(st.on&&g!=='g1')return `<span class="stb bad" title="Pobiera paszę ze stacji (wczoraj ${fNum(st.y)} kg), a w aplikacji nie jest w Grupie 1. Sprawdź przypisanie.${esc(warn)}">S!</span>`;
+  if(st.on)return `<span class="stb" title="Pobiera paszę ze stacji: ${fD2(IX.d.ref)} ${fNum(st.y)} kg, dzień wcześniej ${fNum(st.y1)} kg.${esc(warn)}">S</span>`;
+  if(g==='g1'&&st.none3&&!L.zas)return `<span class="stb off" title="W Grupie 1, ale od 3 dni nie pobiera paszy ze stacji (choć jest dojona). Sprawdź responder, dawkę w Infodexie albo zdrowie krowy.${esc(warn)}">S</span>`;
+  return '';
+}
+/* krowy pobierające paszę ze stacji, a przypisane w aplikacji poza Grupą 1 */
+function stWrong(){
+  if(!ixHas())return[];
+  return activeCows().filter(c=>gOf(c)!=='g1').map(c=>({c,L:lac(c)})).filter(x=>x.L.id&&stInfo(x.L.id).on).map(x=>x.c).sort((a,b)=>(a.nr??1e9)-(b.nr??1e9));
+}
+function cowCard(c){
+  const g=gOf(c),L=lac(c),d=L.dim,sg=suggestion(c),lt=lacType(c);
+  const over=g==='g1'&&d!==null&&d>=progG1(c)&&!L.zas;
+  let dimTxt=d===null?'':`${d} dni`;
+  if(g==='zas'||L.zas){const pw=planWyc(c);dimTxt=pw?`wyc. za ${dayDiff(todayISO(),pw)} dni`:'zasuszona'}
+  const pd=c.ostPd,pdCur=pd&&(!L.dataWyc||pd.date>=L.dataWyc);
+  const kg=kgOf(c),kgIx=L.id&&ixMilk7(L.id)!=null;
+  const meta=[L.lakt?`lakt. ${L.lakt}`:'',kg!=null?`${fNum(kg)} kg${kgIx?'':' (PD)'}`:'',L.zas&&g!=='zas'?'zasuszona':'',pdCur&&pd.info?esc(pd.info):''].filter(Boolean).join(' · ');
+  return `<div class="cow${over?' over':''}${lt?' lt-'+lt:''}${S.sel.has(c.kolczyk)?' sel':''}" data-k="${esc(c.kolczyk)}" ${!S.selMode?'draggable="true"':''}>
+    <span class="nr">${esc(c.nr??'?')}${stBadge(c)}</span><span class="nm">${esc(c.nazwa||c.kolczyk)}</span>
+    <span class="dim">${dimTxt}</span>
+    <span class="meta">${meta}${L.fresh&&d!=null&&d<=60?`<span class="fresh-b" title="Wycielenie ${fDate(L.dataWyc)} zapisane w Infodexie. Nie ma go jeszcze w próbnym doju.">nowe wycielenie</span>`:''}${pinned(c)?'<span class="pin" title="Przypięta">📌</span>':''}${sg?`<span class="hint">→ ${GR[sg.to].s}</span>`:''}</span></div>`;
+}
+const lacLegend=()=>`<div class="lgd"><span class="lg lt-p">pierwiastki</span><span class="lg lt-w">wieloródki</span><span class="lg lt-z">zasuszone</span>${ixHas()?`<span><span class="stb">S</span> pobiera paszę ze stacji</span><span><span class="stb bad">S!</span> stacja, a nie Grupa 1</span><span><span class="stb off">S</span> Grupa 1 bez paszy 3 dni</span>`:''}<span class="muted">Dzień laktacji i numer laktacji: ${ixHas()?'z Infodexu':'z próbnego doju'}</span></div>`;
 function renderGrupy(){
   const cows=activeCows();
   const sugs=cows.map(c=>({c,s:suggestion(c)})).filter(x=>x.s).sort((a,b)=>(a.c.nr??1e9)-(b.c.nr??1e9));
@@ -557,7 +643,10 @@ function renderGrupy(){
     return `<div class="col${S.mobCol===g?' mob':''}" data-g="${g}"><div class="col-h"><b>${GR[g].n}</b>${S.selMode&&list.length?`<button class="sel-all" data-selall="${g}">zaznacz</button>`:''}<span class="n">${cnt[g]}</span></div>
       ${list.map(cowCard).join('')||'<div class="muted" style="padding:8px">—</div>'}</div>`;
   };
+  const wrong=stWrong();
   $('#main').innerHTML=`
+  ${wrong.length?`<div class="card no-print stwarn"><div class="row"><span class="stb bad">S!</span><div><b>Pobierają paszę ze stacji, a w aplikacji nie są w Grupie 1 (${wrong.length})</b><div class="muted">Do stacji ma dostęp tylko Grupa 1, więc przypisanie w aplikacji jest prawdopodobnie złe.</div></div><span class="spacer"></span><button class="btn sm pri" id="wrongAll">Wszystkie → Grupa 1</button></div>
+    <div class="sug-list">${wrong.map(c=>{const st=stInfo(lac(c).id),iss=ixIssueOf(lac(c).id);return `<div class="sug"><span></span><span class="nr">${esc(c.nr??'?')}</span><div><span class="arrow">${chip(gOf(c))}</span> <span class="why">stacja: ${fD2(IX.d.ref)} ${fNum(st.y)} kg, dzień wcześniej ${fNum(st.y1)} kg${iss?` · <b class="warn">uwaga: ${esc(iss.msg)}</b>`:''}</span></div><div class="acts"><button class="btn sm" data-wr="${esc(c.kolczyk)}">→ Grupa 1</button></div></div>`}).join('')}</div></div>`:''}
   ${sugs.length?`<div class="card no-print"><div class="sug-head"><span class="sug-count">${sugs.length}</span><div><b>${sugs.length===1?'krowa do przeniesienia':'krów do przeniesienia'}</b><div class="muted">Podpowiedzi według dnia laktacji i próbnego doju. Nic nie przesuwa się bez Twojego potwierdzenia.</div></div>
     <span class="spacer"></span><button class="btn sm" id="sugToggle">${S.sugOpen?'Zwiń':'Pokaż'}</button><button class="btn sm pri" id="sugAll">Przenieś zaznaczone</button></div>
     ${S.sugOpen?`<div class="sug-list">${sugs.map(({c,s})=>`<div class="sug"><input type="checkbox" class="sugck" data-k="${esc(c.kolczyk)}" checked aria-label="Zaznacz"><span class="nr">${esc(c.nr??'?')}</span>
@@ -574,8 +663,11 @@ function renderGrupy(){
   </div>
   <div class="coltabs no-print">${GORDER.map(g=>`<button data-mc="${g}" class="${S.mobCol===g?'on':''}"><span>${{brak:'Brak',g1:'Grupa 1',g2:'Grupa 2',zas:'Zasusz.'}[g]}</span><b>${cnt[g]}</b></button>`).join('')}</div>
   <div class="drag-hint no-print">Przytrzymaj krowę i przeciągnij ją na nazwę grupy powyżej.</div>
-  <div class="board" id="board">${GORDER.map(colHtml).join('')}</div>`;
+  <div class="board" id="board">${GORDER.map(colHtml).join('')}</div>
+  ${lacLegend()}`;
   bindGrupy();
+  const wa=$('#wrongAll');if(wa)wa.onclick=()=>moveCows(wrong,'g1','pobiera paszę ze stacji');
+  document.querySelectorAll('[data-wr]').forEach(b=>b.onclick=()=>{const c=S.farm.cows[b.dataset.wr];if(c)moveCows([c],'g1','pobiera paszę ze stacji')});
 }
 function bindGrupy(){
   const q=$('#q');q.oninput=()=>{S.q=q.value;const pos=q.selectionStart;renderGrupy();const n=$('#q');n.focus();n.setSelectionRange(pos,pos)};
@@ -703,9 +795,12 @@ function cowSheet(k){
   const hist=S.farm.moves.filter(m=>m.kolczyk===k).slice(0,20);
   const pds=Object.values(S.farm.tests).map(t=>({date:t.date,r:(t.rows||[]).find(r=>r.kolczyk===k)})).filter(x=>x.r).sort((a,b)=>b.date.localeCompare(a.date));
   const ixId=ixHas()?ixL().app2ix[k]:null;
-  openModal(`<div class="row"><h2 style="margin:0">Krowa ${esc(c.nr??'?')}</h2>${chip(g)}<span class="spacer"></span><button class="btn sm" data-close>Zamknij</button></div>
+  LACC.delete(k);const L=lac(c),lt=lacType(c);
+  const solDiff=L.src==='ix'&&(c.lakt!==L.lakt||c.dataWyc!==L.dataWyc)&&(c.lakt!=null||c.dataWyc);
+  openModal(`<div class="row"><h2 style="margin:0">Krowa ${esc(c.nr??'?')}${stBadge(c)}</h2>${chip(g)}${lt?`<span class="ltb lt-${lt}">${LTN[lt]}</span>`:''}<span class="spacer"></span><button class="btn sm" data-close>Zamknij</button></div>
   <div class="muted">${esc(c.nazwa||'')} · ${esc(c.kolczyk)}${c.responder?' · resp. '+esc(c.responder):''}</div>
-  <div class="muted">Laktacja ${esc(c.lakt??'–')} · wycielenie ${fDate(c.dataWyc)} · dzień laktacji ${d??'–'}${c.grupaOd?' · w grupie od '+fDate(c.grupaOd.slice(0,10)):''}</div>
+  <div class="muted">Laktacja ${esc(L.lakt??'–')} · wycielenie ${fDate(L.dataWyc)} · dzień laktacji ${d??'–'}${L.src==='ix'?' <i>(Infodex)</i>':''}${c.grupaOd?' · w grupie od '+fDate(c.grupaOd.slice(0,10)):''}</div>
+  ${solDiff?`<div class="muted">W próbnym doju: laktacja ${esc(c.lakt??'–')}, wycielenie ${fDate(c.dataWyc)}.</div>`:''}
   ${sg?`<p class="warn" style="margin:8px 0 0">Podpowiedź: ${GR[sg.to].n} (${esc(sg.why)})</p>`:''}
   ${ixId?'<div id="csIx"></div><h3 style="margin-top:18px;border-top:1px solid var(--c-brd);padding-top:14px">Grupa i notatki</h3>':''}
   <div class="gbtns">${['g1','g2','zas','brak'].map(x=>`<button class="b-${x}${x===g?' cur':''}" data-mv="${x}">${GR[x].n}</button>`).join('')}</div>
@@ -734,9 +829,10 @@ function cowSheet(k){
   };
   $('#csWycBtn').onclick=async()=>{
     const dw=$('#csWyc').value;if(!dw)return toast('Wybierz datę wycielenia');
-    if(c.dataWyc&&dw<=c.dataWyc)return toast(`Data musi być późniejsza niż ostatnie wycielenie (${fDate(c.dataWyc)})`,4000);
+    const Lc=lac(c);
+    if(Lc.dataWyc&&dw<=Lc.dataWyc)return toast(`Data musi być późniejsza niż ostatnie wycielenie (${fDate(Lc.dataWyc)})`,4000);
     const at=nowISO();
-    const f={dataWyc:dw,lakt:(c.lakt||0)+1,plWyc:null,pin:null,grupa:'g1',grupaOd:at,updatedAt:at};
+    const f={dataWyc:dw,lakt:(Lc.lakt||0)+1,plWyc:null,pin:null,grupa:'g1',grupaOd:at,updatedAt:at};
     const mv={id:at.replace(/\D/g,'')+'-'+k,kolczyk:k,nr:c.nr??null,z:gOf(c),na:'g1',at,powod:`wycielenie ${fDate(dw)}`};
     if(await commit({patches:[{k,f}],moves:[mv]})){applyPatches([{k,f}]);S.farm.moves.unshift(mv);S.mobCol='g1';closeModal();toast(`Krowa ${c.nr??''}: wycielenie ${fDate(dw)}, grupa 1`);render()}
   };
@@ -745,7 +841,7 @@ function printGroups(){
   const cows=activeCows();
   const w=window.open('','_blank');if(!w)return toast('Przeglądarka zablokowała nowe okno');
   const sec=g=>{const l=cows.filter(c=>gOf(c)===g).sort((a,b)=>(a.nr??1e9)-(b.nr??1e9));
-    return `<h2>${GR[g].n} (${l.length})</h2><table><tr><th>Nr</th><th>Nazwa</th><th>Kolczyk</th><th>Lakt.</th><th>Dzień lakt.</th><th>Podpowiedź</th></tr>${l.map(c=>{const s=suggestion(c);return`<tr><td><b>${esc(c.nr??'')}</b></td><td>${esc(c.nazwa||'')}</td><td>${esc(c.kolczyk)}</td><td>${esc(c.lakt??'')}</td><td>${dim(c)??''}</td><td>${s?'→ '+GR[s.to].n:''}</td></tr>`}).join('')}</table>`};
+    return `<h2>${GR[g].n} (${l.length})</h2><table><tr><th>Nr</th><th>Nazwa</th><th>Kolczyk</th><th>Lakt.</th><th>Dzień lakt.</th><th>Podpowiedź</th></tr>${l.map(c=>{const s=suggestion(c);return`<tr><td><b>${esc(c.nr??'')}</b></td><td>${esc(c.nazwa||'')}</td><td>${esc(c.kolczyk)}</td><td>${esc(lac(c).lakt??'')}</td><td>${dim(c)??''}</td><td>${s?'→ '+GR[s.to].n:''}</td></tr>`}).join('')}</table>`};
   w.document.write(`<html><head><meta charset="utf-8"><title>Grupy – ${esc(S.farm.name)}</title><style>body{font-family:Segoe UI,Arial;font-size:12px}table{border-collapse:collapse;width:100%;margin-bottom:14px}td,th{border:1px solid #bbb;padding:3px 6px;text-align:left}h1{font-size:16px}h2{font-size:14px;margin:12px 0 4px}</style></head><body><h1>${esc(S.farm.name)} – grupy, ${fDate(todayISO())}</h1>${['g1','g2','zas','brak'].map(sec).join('')}<script>window.print()<\/script></body></html>`);
   w.document.close();
 }
@@ -753,7 +849,7 @@ function printGroups(){
 /* ================== ZAKŁADKA: STADO ================== */
 const STADO_COLS=[
   ['nr','Nr',c=>c.nr,1],['nazwa','Nazwa',c=>c.nazwa||''],['kolczyk','Kolczyk',c=>c.kolczyk],['grupa','Grupa',c=>GORDER.indexOf(gOf(c))],
-  ['lakt','Lakt.',c=>c.lakt,1],['dataWyc','Wycielenie',c=>c.dataWyc||''],['dim','Dzień lakt.',c=>dim(c),1],
+  ['lakt','Lakt.',c=>lac(c).lakt,1],['dataWyc','Wycielenie',c=>lac(c).dataWyc||''],['dim','Dzień lakt.',c=>dim(c),1],
   ['kg','kg (PD)',c=>c.ostPd?.kg,1],['tl','Tł %',c=>c.ostPd?.tl,1],['bi','Bi %',c=>c.ostPd?.bi,1],['tb','T/B',c=>c.ostPd?.tb,1],
   ['moc','Mocznik',c=>c.ostPd?.moc,1],['lks','LKS',c=>c.ostPd?.lks,1],['info','Uwagi PD',c=>c.ostPd?.info||'']
 ];
@@ -767,13 +863,13 @@ function stadoRows(){
 function renderStado(){
   const s=S.farm.settings,rows=stadoRows();
   const cell=(c,k)=>{const p=c.ostPd||{};switch(k){
-    case'nr':return`<td class="n"><b>${esc(c.nr??'')}</b></td>`;
+    case'nr':{const lt=lacType(c);return`<td class="n"><span class="ltd ${lt?'lt-'+lt:''}" title="${lt?LTN[lt]:''}"></span><b>${esc(c.nr??'')}</b>${stBadge(c)}</td>`}
     case'nazwa':return`<td>${esc(c.nazwa||'')}${pinned(c)?' 📌':''}</td>`;
     case'kolczyk':return`<td>${esc(c.kolczyk)}</td>`;
     case'grupa':return`<td>${chip(gOf(c))}</td>`;
-    case'lakt':return`<td class="n">${esc(c.lakt??'')}</td>`;
-    case'dataWyc':return`<td>${fDate(c.dataWyc)}</td>`;
-    case'dim':{const d=dim(c);return`<td class="n ${gOf(c)==='g1'&&d>=progG1(c)?'bad':''}">${d??'–'}</td>`}
+    case'lakt':return`<td class="n">${esc(lac(c).lakt??'')}</td>`;
+    case'dataWyc':return`<td>${fDate(lac(c).dataWyc)}</td>`;
+    case'dim':{const d=dim(c);return`<td class="n ${gOf(c)==='g1'&&d>=progG1(c)?'bad':''}">${lac(c).zas?'zas.':d??'–'}</td>`}
     case'kg':return`<td class="n">${fNum(p.kg)}</td>`;
     case'tl':return`<td class="n">${fNum(p.tl,2)}</td>`;
     case'bi':return`<td class="n ${p.bi!=null&&(p.bi<s.biMin)?'warn':''}">${fNum(p.bi,2)}</td>`;
@@ -789,13 +885,13 @@ function renderStado(){
     <span class="spacer"></span><span class="muted">${rows.length} krów</span><button class="btn" id="expBtn">Eksport do Excela</button></div>
   <div class="tbl-wrap"><table><thead><tr>${STADO_COLS.map(([k,n,,num])=>`<th class="${num?'n':''}" data-sk="${k}">${n}${S.stadoSort.k===k?(S.stadoSort.d>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
   <tbody>${rows.map(c=>`<tr data-k="${esc(c.kolczyk)}">${STADO_COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="14" class="muted">Brak krów w tym widoku.</td></tr>`}</tbody></table></div>
-  <p class="muted">Wartości składu mleka pochodzą z ostatniego wgranego próbnego doju. Kolorem oznaczone wartości poza normami z Ustawień.</p>`;
+  ${lacLegend()}<p class="muted">Laktacja, wycielenie i dzień laktacji: ${ixHas()?'z Infodexu (bieżące)':'z próbnego doju'}. Wartości składu mleka pochodzą z ostatniego wgranego próbnego doju. Kolorem oznaczone wartości poza normami z Ustawień.</p>`;
   const q=$('#q');q.oninput=()=>{S.q=q.value;const p=q.selectionStart;renderStado();const n=$('#q');n.focus();n.setSelectionRange(p,p)};
   document.querySelectorAll('[data-fg]').forEach(b=>b.onclick=()=>{S.stadoG=b.dataset.fg;renderStado()});
   document.querySelectorAll('[data-sk]').forEach(th=>th.onclick=()=>{const k=th.dataset.sk;S.stadoSort=S.stadoSort.k===k?{k,d:-S.stadoSort.d}:{k,d:1};renderStado()});
   document.querySelectorAll('tbody tr[data-k]').forEach(tr=>tr.onclick=()=>cowSheet(tr.dataset.k));
   $('#expBtn').onclick=()=>{
-    const data=rows.map(c=>{const p=c.ostPd||{};return{'Nr':c.nr,'Nazwa':c.nazwa,'Kolczyk':c.kolczyk,'Grupa':GR[gOf(c)].n,'W grupie od':c.grupaOd?c.grupaOd.slice(0,10):'','Laktacja':c.lakt,'Wycielenie':c.dataWyc,'Dzień laktacji':dim(c),'Planowane wycielenie':c.plWyc||'','PD data':p.date||'','kg':p.kg,'Tł %':p.tl,'Bi %':p.bi,'T/B':p.tb,'Mocznik':p.moc,'LKS':p.lks,'Uwagi PD':p.info||'','Notatka':c.notatka||''}});
+    const data=rows.map(c=>{const p=c.ostPd||{};return{'Nr':c.nr,'Nazwa':c.nazwa,'Kolczyk':c.kolczyk,'Grupa':GR[gOf(c)].n,'W grupie od':c.grupaOd?c.grupaOd.slice(0,10):'','Laktacja':lac(c).lakt,'Wycielenie':lac(c).dataWyc,'Typ':LTN[lacType(c)]||'','Stacja (ostatni dzień, kg)':lac(c).id?stInfo(lac(c).id).y:'','Dzień laktacji':dim(c),'Planowane wycielenie':c.plWyc||'','PD data':p.date||'','kg':p.kg,'Tł %':p.tl,'Bi %':p.bi,'T/B':p.tb,'Mocznik':p.moc,'LKS':p.lks,'Uwagi PD':p.info||'','Notatka':c.notatka||''}});
     const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Stado');
     XLSX.writeFile(wb,`stado_formela_${todayISO()}.xlsx`);
   };
@@ -956,6 +1052,7 @@ function renderUst(){
   <div class="card"><h2>Alerty, kalendarz i żywienie</h2><div class="grid2">
     ${num('alertMleko','Alert: spadek mleka o (%)')}${num('alertRum','Alert: spadek przeżuwania o (%)')}${num('vwp','Gotowa do krycia od dnia laktacji')}${num('badanieCiazyOd','Badanie ciąży: dni po inseminacji')}
     ${num('kodCiazy','Kod „cielna” w badaniu ciąży (Infodex)')}${num('zmianaPomin','Zmiana dawki: pomiń pierwsze dni')}
+    ${num('limitZolty','Stacja: limit wykorzystany poniżej (%) = żółty')}${num('limitCzerwony','Stacja: limit wykorzystany poniżej (%) = czerwony')}
     ${num('tmrMleko','Stacja: TMR pokrywa (kg mleka)')}${num('kgPaszyNaKgMleka','Stacja: kg paszy na 1 kg mleka',0.05)}${num('cenaPaszy','Cena paszy treściwej (zł/kg)',0.05)}
     ${num('lat','Pogoda: szerokość geogr.',0.01)}${num('lon','Pogoda: długość geogr.',0.01)}</div>
     <div class="row" style="margin-top:14px"><span class="spacer"></span><button class="btn" id="defBtn">Przywróć domyślne</button><button class="btn pri" id="saveSet">Zapisz ustawienia</button></div></div>
@@ -963,9 +1060,10 @@ function renderUst(){
     <div class="row"><button class="btn" id="bkExp">Pobierz kopię (JSON)</button><label class="btn">Wczytaj kopię<input type="file" id="bkImp" accept=".json" hidden></label></div>
     <p class="muted" style="margin-top:12px">GR Formela, wersja ${APP_VER}</p></div>
   <div class="card"><h2>Dane z Infodexu</h2>
-    <p class="muted">Wczytaj plik <b>infodex_export.json</b> zrobiony na komputerze w gospodarstwie (EKSPORT.bat). Dane z pliku trafiają do bazy, grupy ani notatki nie są ruszane.</p>
+    <p class="muted">Agent na komputerze w oborze wysyła dane sam, codziennie o 23:59. Grupy ani notatki nie są ruszane.</p>
     <p class="muted" id="ixStatus">Sprawdzam ostatnią aktualizację…</p>
-    <div class="row"><label class="btn pri">Wczytaj plik z Infodexu<input type="file" id="ixFile" accept=".json" hidden></label></div>
+    <p class="muted" style="margin-top:10px"><b>Awaryjnie, bez internetu w oborze:</b> wczytaj plik <b>infodex_export.json</b> zrobiony przez EKSPORT_do_pliku.bat.</p>
+    <div class="row"><label class="btn">Wczytaj plik z Infodexu<input type="file" id="ixFile" accept=".json" hidden></label></div>
     <div id="ixProg" class="muted" style="margin-top:8px"></div>
     ${ixHas()?(()=>{const iss=ixL().issues;return iss.length?`<details style="margin-top:12px"><summary><b>Dopasowanie krów Infodex ↔ próbny dój: ${iss.length} uwag</b></summary><p class="muted">Krowy łączę po kolczyku, a gdy się nie zgadza, po numerze. Popraw kolczyki w Infodexie albo w SOL, żeby dane się nie myliły.</p><div class="hist">${iss.map(i=>`<div>${esc(i.msg)}</div>`).join('')}</div></details>`:'<p class="muted" style="margin-top:12px">Wszystkie krowy z Infodexu dopasowane do próbnego doju.</p>'})():''}</div>`;
   ixShowStatus();
@@ -1014,7 +1112,7 @@ const IXDB={
       for(const k in obj)st.put(obj[k],k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});
   }
 };
-const IX={meta:null,herd:null,events:[],days:{},d:null,loading:false};
+const IX={meta:null,herd:null,events:[],days:{},feed:null,d:null,loading:false};
 const EVN={1:'Ruja',2:'Inseminacja',3:'Badanie ciąży',4:'Zasuszenie',5:'Wycielenie',6:'Leczenie',7:'Podanie leku',8:'Wprowadzenie do stada',9:'Usunięcie ze stada'};
 const med=a=>{const v=a.filter(x=>x!==null&&x!==undefined&&!isNaN(x)).sort((x,y)=>x-y);if(!v.length)return null;const m=v.length>>1;return v.length%2?v[m]:(v[m-1]+v[m])/2};
 const fD2=iso=>iso?iso.slice(8,10)+'.'+iso.slice(5,7):'–';
@@ -1030,22 +1128,23 @@ async function ixLoad(){
   try{
     let kv={},days={};
     try{kv=await IXDB.getAll('kv');days=await IXDB.getAll('days')}catch(e){console.warn('IX cache',e)}
-    if(kv.meta){IX.meta=kv.meta;IX.herd=kv.herd||null;IX.events=(kv.events&&kv.events.list)||[];IX.days=days;ixBuild();ixRerender()}
+    if(kv.meta){IX.meta=kv.meta;IX.herd=kv.herd||null;IX.events=(kv.events&&kv.events.list)||[];IX.feed=kv.feed||null;IX.days=days;ixBuild();ixRerender()}
     if(!LOCAL&&db){
       const fr=db.collection('farms').doc(S.farmId);
       const ms=await fr.collection('ix').doc('meta').get();
       if(ms.exists){
         const m=ms.data();
         if(!kv.meta||kv.meta.at!==m.at||kv.meta.imported!==m.imported){
-          const [h,e]=await Promise.all([fr.collection('ix').doc('herd').get(),fr.collection('ix').doc('events').get()]);
+          const [h,e,fd]=await Promise.all([fr.collection('ix').doc('herd').get(),fr.collection('ix').doc('events').get(),fr.collection('ix').doc('feed').get()]);
           const known=Object.keys(days).sort();
           let q=fr.collection('ix_days');
-          if(kv.meta&&known.length)q=q.where('date','>=',addDays(known[known.length-1],-21));
+          // agent wysyła 7 ostatnich dni – pobieram tylko je (mniej odczytów z bazy)
+          if(kv.meta&&known.length)q=q.where('date','>=',addDays(known[known.length-1],-8));
           const ds=await q.get();
           const nd={};ds.forEach(x=>{nd[x.id]=x.data()});
           Object.assign(days,nd);
-          IX.meta=m;IX.herd=h.exists?h.data():null;IX.events=e.exists?(e.data().list||[]):[];IX.days=days;
-          try{await IXDB.putMany('days',nd);await IXDB.putMany('kv',{meta:m,herd:IX.herd,events:{list:IX.events}})}catch(err){console.warn(err)}
+          IX.meta=m;IX.herd=h.exists?h.data():null;IX.events=e.exists?(e.data().list||[]):[];IX.days=days;IX.feed=fd.exists?fd.data():null;
+          try{await IXDB.putMany('days',nd);await IXDB.putMany('kv',{meta:m,herd:IX.herd,events:{list:IX.events},feed:IX.feed})}catch(err){console.warn(err)}
           ixBuild();ixRerender();
         }
       }
@@ -1053,7 +1152,7 @@ async function ixLoad(){
   }catch(e){console.error(e);toast('Nie udało się pobrać danych z Infodexu: '+e.message,5000)}
   finally{IX.loading=false}
 }
-function ixRerender(){if(S.farm&&['dzis','zyw'].includes(S.tab))render()}
+function ixRerender(){if(S.farm&&['dzis','zyw','grupy','stado'].includes(S.tab)&&!$('#modalRoot .modal'))render()}
 const ixHas=()=>!!(IX.d&&IX.d.dates.length);
 
 function ixBuild(){
@@ -1061,7 +1160,10 @@ function ixBuild(){
   const meta=IX.meta||{};
   D.dates=Object.keys(IX.days).sort();
   const exp=(meta.at||'').slice(0,10);
-  D.ref=[...D.dates].reverse().find(d=>!exp||d<exp)||D.dates[D.dates.length-1]||null;
+  // dzień eksportu liczy się jako pełny, gdy agent działał po 22:00 (codziennie o 23:59)
+  const full=(meta.at||'').slice(11,13)>='22';
+  D.ref=[...D.dates].reverse().find(d=>!exp||d<exp||(full&&d===exp))||D.dates[D.dates.length-1]||null;
+  IX.fp=undefined;LACC.clear();
   const ser={};
   for(const dt of D.dates){const c=(IX.days[dt]||{}).c||{};for(const id in c)(ser[id]=ser[id]||{})[dt]=c[id]}
   D.ser=ser;
@@ -1095,6 +1197,18 @@ function ixLinks(){
 }
 let IXL=null;
 function ixL(){IXL=ixLinks();return IXL}
+/* bieżąca laktacja z Infodexu: najpóźniejsza z dat wycielenia (zdarzenie, raport dzienny, karta krowy) */
+function ixLacId(id){
+  const D=IX.d,h=ixCows()[id];if(!D||!h)return null;
+  const T=todayISO();
+  const calvs=((D.ev[id])||[]).filter(e=>e.t===5).map(e=>e.d.slice(0,10)).sort();
+  const ser=D.ser[id]||{},ds=Object.keys(ser).sort();
+  let cdS=null;for(let i=ds.length-1;i>=0&&i>=ds.length-30;i--){const x=ser[ds[i]];if(x.dim!=null&&x.dim>=0){cdS=addDays(ds[i],-x.dim);break}}
+  const hAt=((IX.herd&&IX.herd.at)||(IX.meta&&IX.meta.at)||'').slice(0,10);
+  const cdH=h.dim!=null&&h.dim>=0&&hAt?addDays(hAt,-h.dim):null;
+  const c=[calvs[calvs.length-1],cdS,cdH].filter(x=>x&&x<=T).sort();
+  return{cd:c.length?c[c.length-1]:null,calvs,calv:h.calv||0,dry:h.state===3};
+}
 const ixNr=id=>{const k=IXL&&IXL.ix2app[id];const c=k&&S.farm.cows[k];return c&&c.nr!=null?c.nr:id};
 const nrLink=(id,extra='')=>`<span class="ixc" data-ix="${esc(id)}">${esc(ixNr(id))}${extra}</span>`;
 document.addEventListener('click',e=>{const el=e.target.closest('[data-ix]');if(el){e.preventDefault();openIxCow(el.dataset.ix)}});
@@ -1139,7 +1253,7 @@ function ixLact(id){
   segs.forEach(sg=>{sg.pts=sg.pts.map(p=>({...p,dim:dayDiff(sg.cd,p.dt)})).filter(p=>p.dim>=0)});
   const h=ixCows()[id]||{};
   const k=IXL&&IXL.ix2app[id],ac=k&&S.farm.cows[k];
-  const cur=Math.max(h.calv||0,ac?.lakt||0)||null;
+  const cur=Math.max(h.calv||0,(ac?lac(ac).lakt:0)||0)||null;
   segs.forEach((sg,i)=>{sg.lakt=cur?cur-(segs.length-1-i):null});
   // numer laktacji < 1 oznacza dane innego zwierzęcia pod tym samym numerem (numer użyty ponownie po brakowaniu)
   const own=segs.filter(sg=>sg.lakt==null||sg.lakt>=1);
@@ -1282,7 +1396,7 @@ const thiCls=v=>v==null?'':v>=72?'r':v>=68?'a':'g';
 /* ================== WCZYTANIE PLIKU Z INFODEXU ================== */
 async function ixShowStatus(){
   const el=$('#ixStatus');if(!el)return;
-  const show=d=>{el.innerHTML=d?`Ostatnia aktualizacja: <b>${esc(d.at||'?')}</b>${d.first?`, dane od <b>${fDate(d.first)}</b> do <b>${fDate(d.last)}</b>`:''}.`:'Jeszcze nic nie wczytano.'};
+  const show=d=>{el.innerHTML=d?`Ostatnia aktualizacja: <b>${esc(d.at||'?')}</b> (${d.via==='plik'?'z pliku':'agent, komputer '+esc(d.host||'?')}${d.agent?', wersja '+esc(d.agent):''})${d.first?`, dane od <b>${fDate(d.first)}</b> do <b>${fDate(d.last)}</b>`:''}.`:'Jeszcze nic nie wczytano.'};
   if(LOCAL||!db){show(IX.meta);return}
   try{const m=await db.collection('farms').doc(S.farmId).collection('ix').doc('meta').get();show(m.exists?m.data():null)}
   catch(e){show(IX.meta)}
@@ -1309,10 +1423,11 @@ async function ixImport(file){
       say('Zapisuję stado i zdarzenia…');
       await fr.collection('ix').doc('herd').set(d.herd);
       await fr.collection('ix').doc('events').set(d.events||{at:d.exported,list:[]});
+      if(d.feed)await fr.collection('ix').doc('feed').set(d.feed);
       await fr.collection('ix').doc('meta').set(meta,{merge:true});
     }
-    try{await IXDB.putMany('days',d.days);await IXDB.putMany('kv',{meta,herd:d.herd,events:d.events||{list:[]}})}catch(e){console.warn(e)}
-    Object.assign(IX.days,d.days);IX.meta=meta;IX.herd=d.herd;IX.events=(d.events&&d.events.list)||[];
+    try{await IXDB.putMany('days',d.days);await IXDB.putMany('kv',{meta,herd:d.herd,events:d.events||{list:[]},feed:d.feed||IX.feed})}catch(e){console.warn(e)}
+    Object.assign(IX.days,d.days);IX.meta=meta;IX.herd=d.herd;IX.events=(d.events&&d.events.list)||[];if(d.feed)IX.feed=d.feed;
     ixBuild();
     say(`Gotowe. Wczytano ${days.length} dni, ${Object.keys(d.herd.cows||{}).length} krów.`);
     toast('Wczytano dane z Infodexu');
@@ -1326,14 +1441,14 @@ async function ixImport(file){
 /* ================== ZAKŁADKA: DZIŚ ================== */
 function ixNoData(){
   return `<div class="card"><h2>Brak danych z Infodexu</h2>
-  <p>Ten ekran pokazuje codzienne mleko, krowy do sprawdzenia i kalendarz. Potrzebuje pliku <b>infodex_export.json</b> z komputera w gospodarstwie (EKSPORT_calosc.bat lub EKSPORT_ostatnie_dni.bat).</p>
-  <div class="row">${ixFileInput()}</div><div id="ixProg" class="muted" style="margin-top:8px"></div></div>`;
+  <p>Ten ekran pokazuje codzienne mleko, krowy do sprawdzenia i kalendarz. Dane wysyła agent z komputera w oborze (uruchom tam raz <b>ZAINSTALUJ.bat</b>). Awaryjnie, bez internetu: plik <b>infodex_export.json</b> z EKSPORT_do_pliku.bat.</p>
+  <div class="row">${ixFileInput('ixFile','Wczytaj plik z Infodexu',false)}</div><div id="ixProg" class="muted" style="margin-top:8px"></div></div>`;
 }
 function freshBar(){
   const D=IX.d,age=D.ref?dayDiff(D.ref,todayISO()):null;
   const old=age!=null&&age>2;
-  return `<div class="fresh${old?' old':''}"><span>Dane z Infodexu do <b>${fDate(D.ref)}</b>${age!=null?` (${age===1?'wczoraj':age+' dni temu'})`:''}</span><span class="spacer"></span>
-    ${old?'<span class="muted">Wczytaj świeży plik, żeby alerty dotyczyły bieżących dni.</span>':''}${ixFileInput('ixFile','Wczytaj nowy plik',old)}</div><div id="ixProg" class="muted"></div>`;
+  return `<div class="fresh${old?' old':''}"><span>Dane z Infodexu do <b>${fDate(D.ref)}</b>${age!=null?` (${age===0?'dziś':age===1?'wczoraj':age+' dni temu'})`:''}</span><span class="spacer"></span>
+    ${old?`<span class="muted">Agent z obory nie wysłał danych od ${age-1} dni. Sprawdź, czy komputer w oborze jest włączony i ma internet. Awaryjnie wczytaj plik.</span>${ixFileInput('ixFile','Wczytaj plik',false)}`:''}</div><div id="ixProg" class="muted"></div>`;
 }
 function hiddenKey(){return 'grformela.ok.'+IX.d.ref}
 function getHidden(){try{return new Set(JSON.parse(localStorage.getItem(hiddenKey())||'[]'))}catch(e){return new Set()}}
@@ -1353,7 +1468,9 @@ function renderDzis(){
   const dayName=d=>d===T?'Dziś':d===addDays(T,1)?'Jutro':`${wday(d)} ${fD2(d)}`;
   const byDay={};C.items.forEach(x=>{(byDay[x.d]=byDay[x.d]||[]).push(x)});
   const ptNow=C.ptDue.filter(x=>x.days<=60),ptOld=C.ptDue.filter(x=>x.days>60);
+  const wr=stWrong();
   $('#main').innerHTML=`${freshBar()}
+  ${wr.length?`<div class="card stwarn"><div class="row"><span class="stb bad">S!</span><div><b>Sprawdź przypisanie do grupy (${wr.length}):</b> pobierają paszę ze stacji, a w aplikacji nie są w Grupie 1.<div class="ids" style="margin-top:6px">${wr.map(c=>nrLink(lac(c).id)).join('')}</div></div><span class="spacer"></span><button class="btn sm" onclick="goTab('grupy')">Popraw w Grupach</button></div></div>`:''}
   <div class="tiles">
     <div class="tile"><span class="muted">Mleko stada ${fD2(R)}</span><b>${fNum(hd.tot,0)} kg</b><span class="sub">${arrow(dTot)} względem średniej z 7 dni (${fNum(t7,0)} kg)</span></div>
     <div class="tile"><span class="muted">Średnio na krowę</span><b>${fNum(hd.avg)} kg</b><span class="sub">${dAvg==null?'':(dAvg>=0?'+':'')+fNum(dAvg)+' kg'} · dojonych ${hd.cows||0}</span></div>
@@ -1435,7 +1552,7 @@ function ixCowSection(el,id){
   el.innerHTML=`<div class="kpis" style="margin-top:12px">
     <div class="kpi"><span class="muted">Mleko ${fD2(R)}</span><b>${fNum(r.m)} kg</b><span class="muted">${r.m1||r.m2?`rano ${fNum(r.m1)} · wiecz. ${fNum(r.m2)}`:''}</span></div>
     <div class="kpi"><span class="muted">Średnio 7 dni</span><b>${fNum(avg(last7))} kg</b><span class="muted">${exp?`krzywa stada: ${fNum(exp)} kg`:''}</span></div>
-    <div class="kpi"><span class="muted">Dzień laktacji</span><b>${r.dim??h.dim??'–'}</b><span class="muted">laktacja ${cur&&cur.lakt?cur.lakt:(h.calv??'–')}</span></div>
+    <div class="kpi"><span class="muted">Dzień laktacji (dziś)</span><b>${(()=>{const x=ixLacId(id);return x&&x.cd?dayDiff(x.cd,todayISO()):(r.dim??h.dim??'–')})()}</b><span class="muted">laktacja ${cur&&cur.lakt?cur.lakt:(h.calv??'–')}</span></div>
     <div class="kpi"><span class="muted">Rozród</span><b style="font-size:16px">${esc(rp.stTxt)}</b><span class="muted">${rp.lastIns?`ins. ${fDate(rp.lastIns)} (${rp.insCount}×)`:'bez inseminacji'}${rp.expCalv?`<br>wycielenie ~${fDate(rp.expCalv)}`:''}</span></div>
     ${r.f?`<div class="kpi"><span class="muted">Pasza ze stacji</span><b>${fNum(r.f/1000)} kg</b></div>`:''}
   </div>
@@ -1471,14 +1588,165 @@ function ixCowSection(el,id){
 }
 
 /* ================== ZAKŁADKA: ŻYWIENIE ================== */
-const ZSEC=[['dawka','Zmiany dawki'],['krzywe','Krzywe laktacji'],['stacja','Stacja paszowa'],['sklad','Skład mleka (ECM)'],['upal','Upał']];
+const ZSEC=[['g1','Grupa 1 – stacja'],['krzywe','Krzywe laktacji'],['stacja','Stacja paszowa'],['sklad','Skład mleka (ECM)'],['upal','Upał'],['dawka','Zmiany dawki']];
 function renderZyw(){
   if(!ixHas()){$('#main').innerHTML=ixNoData();bindIxFile();return}
   ixL();
-  if(!S.zSec)S.zSec='dawka';
+  if(!S.zSec)S.zSec='g1';
   $('#main').innerHTML=`<div class="seg no-print">${ZSEC.map(([k,n])=>`<button data-z="${k}" class="${S.zSec===k?'on':''}">${n}</button>`).join('')}</div><div id="zBody"></div>`;
   document.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{S.zSec=b.dataset.z;render()});
-  ({dawka:zDawka,krzywe:zKrzywe,stacja:zStacja,sklad:zSklad,upal:zUpal})[S.zSec]($('#zBody'));
+  ({g1:zG1,dawka:zDawka,krzywe:zKrzywe,stacja:zStacja,sklad:zSklad,upal:zUpal})[S.zSec]($('#zBody'));
+}
+/* ---------- plan dawek stacji z Infodexu (FeedingNew → FeedingDayPoints → FeedingInstructions) ---------- */
+const csvT=s=>{if(!s)return[];const L=String(s).split('\n');const h=L[0].split(',');return L.slice(1).filter(x=>x.trim()).map(l=>{const v=l.split(',');const o={};h.forEach((k,i)=>{const x=v[i];o[k]=x===''||x==null?null:(isNaN(+x)?x:+x)});return o})};
+function ixFeedPlan(){
+  if(IX.fp!==undefined)return IX.fp;
+  IX.fp=null;
+  const t=IX.feed&&IX.feed.tables;if(!t)return null;
+  const FN=csvT(t.FeedingNew),PT=csvT(t.FeedingDayPoints),IN=csvT(t.FeedingInstructions);
+  const P={rows:{},raw:t,pts:{},ins:{},byCow:{},byGroup:{},mode:'id',scale:1,ok:false,n:0,ratio:null};
+  Object.keys(t).forEach(k=>{P.rows[k]=csvT(t[k]).length});
+  PT.forEach(p=>{(P.pts[p.FeedingId]=P.pts[p.FeedingId]||[]).push(p)});Object.values(P.pts).forEach(l=>l.sort((a,b)=>a.Day-b.Day));
+  IN.forEach(x=>{(P.ins[x.PointId]=P.ins[x.PointId]||[]).push(x)});
+  const pick=(o,k,r)=>{const cur=o[k];if(!cur||(cur.IsParlour&&!r.IsParlour))o[k]=r};
+  FN.forEach(r=>{if(r.CowId!=null)pick(P.byCow,String(r.CowId),r);else if(r.GroupId!=null)pick(P.byGroup,String(r.GroupId),r)});
+  IX.fp=P;
+  if(!FN.length||!PT.length||!IN.length)return P;
+  // FeedingNew.CowId to numer krowy albo numer techniczny (DbId) – wybieram wariant pasujący do krów jedzących ze stacji
+  const herd=ixCows(),eaters=Object.keys(herd).filter(id=>stInfo(id).on);
+  const hit=m=>eaters.filter(id=>P.byCow[m==='db'?String(herd[id].dbid):id]).length;
+  P.mode=hit('db')>hit('id')?'db':'id';
+  // jednostka planu: dobieram mnożnik (1, 10, 100, 1000 g), przy którym plan zgadza się z faktycznym pobraniem
+  const D=IX.d,d7=dRange(addDays(D.ref,-6),D.ref),ratios=[];
+  for(const id of eaters){
+    const ser=D.ser[id]||{},f=d7.map(d=>ser[d]&&ser[d].f).filter(x=>x>0);if(f.length<4)continue;
+    const L=ixLacOf(id),raw=planRaw(P,id,L.dim,null);if(raw>0)ratios.push(avg(f)/raw);
+  }
+  P.n=ratios.length;
+  if(ratios.length>=3){const m=med(ratios);P.scale=Math.pow(10,Math.max(0,Math.min(3,Math.round(Math.log10(m)))));P.ratio=m/P.scale;P.ok=P.ratio>=0.4&&P.ratio<=2}
+  return P;
+}
+function ixLacOf(id){const k=IXL&&IXL.ix2app[id],c=k&&S.farm.cows[k];if(c)return lac(c);const x=ixLacId(id);return{dim:x&&x.cd?dayDiff(x.cd,todayISO()):null}}
+function planRaw(P,id,dimv,milk){
+  const h=ixCows()[id]||{};
+  let plan=P.byCow[P.mode==='db'?String(h.dbid):id];
+  if(!plan&&h.grp!=null)plan=P.byGroup[String(h.grp)];
+  if(!plan)return null;
+  const pts=P.pts[plan.Id]||[];if(!pts.length)return null;
+  const val=pt=>{let ins=P.ins[pt.Id]||[];const f0=ins.filter(x=>!x.FoodType);if(f0.length)ins=f0;if(!ins.length)return null;
+    const keys=[...new Set(ins.map(x=>x.YieldKey??0))].sort((a,b)=>a-b);
+    let key=keys[0];if(keys.length>1&&milk!=null)keys.forEach(k=>{if(k<=milk)key=k});
+    return ins.filter(x=>(x.YieldKey??0)===key).reduce((a,x)=>a+(x.Value||0),0)};
+  const dv=dimv??0;let i=-1;pts.forEach((p,j)=>{if(p.Day<=dv)i=j});
+  if(i<0)return val(pts[0]);
+  const a=pts[i],b=pts[i+1],va=val(a);
+  if(b&&b.Day>a.Day){const vb=val(b);if(va!=null&&vb!=null)return va+(vb-va)*(dv-a.Day)/(b.Day-a.Day)}
+  return va;
+}
+const planKg=(P,id,dimv,milk)=>{const r=planRaw(P,id,dimv,milk);return r==null?null:r*P.scale/1000};
+
+/* ---------- Żywienie → Grupa 1 – stacja ---------- */
+function g1Rows(){
+  const D=IX.d,R=D.ref,P=ixFeedPlan(),s=S.farm.settings;
+  const A=ixAlerts(),al={};A.list.forEach(a=>al[a.id]=a);
+  const d7=dRange(addDays(R,-6),R),p7=dRange(addDays(R,-13),addDays(R,-7));
+  const set=new Map();
+  activeCows().filter(c=>gOf(c)==='g1').forEach(c=>set.set(c.kolczyk,false));
+  stWrong().forEach(c=>set.set(c.kolczyk,true));
+  return [...set.entries()].map(([k,wrong])=>{
+    const c=S.farm.cows[k],L=lac(c),id=L.id,ser=id?(D.ser[id]||{}):{},rec=d=>ser[d]||{};
+    const pres=d7.filter(d=>rec(d).m>0||rec(d).f>0);
+    const f7=pres.length?avg(pres.map(d=>(rec(d).f||0)/1000)):null;
+    const fy=rec(R).m>0||rec(R).f>0?(rec(R).f||0)/1000:null;
+    const mv=d7.map(d=>rec(d).m).filter(x=>x>0),pv=p7.map(d=>rec(d).m).filter(x=>x>0);
+    const m7=mv.length?avg(mv):null,mp=pv.length>=4?avg(pv):null;
+    let lim=null,limSrc=null;
+    if(P&&P.ok&&id){const v=planKg(P,id,L.dim,m7);if(v!=null){lim=v;limSrc='plan'}}
+    if(lim==null&&id){const mx=Math.max(0,...d7.map(d=>(rec(d).f||0)/1000));if(mx>0){lim=mx;limSrc='est'}}
+    const pd=c.ostPd,pdOk=pd&&pd.kg&&pd.tl&&pd.bi&&(!L.dataWyc||pd.date>=L.dataWyc);
+    const r7=d7.map(d=>perDay(rec(d),'rum','nr')).filter(v=>v!=null),rp=p7.map(d=>perDay(rec(d),'rum','nr')).filter(v=>v!=null);
+    return{k,c,id,wrong,nr:c.nr,lt:lacType(c),dim:L.dim,lakt:L.lakt,lim,limSrc,fy,f7,
+      use:lim>0&&f7!=null?f7/lim*100:null,my:rec(R).m||null,m7,trend:m7!=null&&mp!=null?m7-mp:null,
+      ecm:pdOk?pd.kg*(0.383*pd.tl+0.242*pd.bi+0.7832)/3.1138:null,ecmD:pdOk?pd.date:null,
+      eff:f7>=0.3&&m7?m7/f7:null,rumT:r7.length>=4&&rp.length>=4&&med(rp)>0?(med(r7)/med(rp)-1)*100:null,al:id?al[id]||null:null};
+  });
+}
+const G1COLS=[
+  ['nr','Krowa',0],['dim','Dzień lakt.',1],['lim','Limit (kg)',1],['fy','Pobrała wczoraj',1],['f7','Pobranie śr. 7 dni',1],['use','Wykorzystanie limitu',1],
+  ['my','Mleko wczoraj',1],['m7','Mleko śr. 7 dni',1],['trend','Trend mleka',1],['ecm','ECM (próbny dój)',1],['eff','kg mleka / kg paszy',1],['rumT','Przeżuwanie 7 dni',1],['al','Alerty',1]
+];
+function zG1(el){
+  const s=S.farm.settings,D=IX.d,R=D.ref,P=ixFeedPlan();
+  if(!S.g1s)S.g1s={k:'nr',d:1};if(!S.g1f)S.g1f='all';if(S.g1q==null)S.g1q='';
+  const all=g1Rows();
+  const useCls=u=>u==null?'':u<s.limitCzerwony?'u-r':u<s.limitZolty?'u-a':'u-g';
+  let rows=all.filter(r=>S.g1f==='low'?r.use!=null&&r.use<s.limitZolty:S.g1f==='alert'?!!r.al:S.g1f==='wrong'?r.wrong:S.g1f==='none'?!(r.f7>0):true);
+  const q=S.g1q.trim().toLowerCase();if(q)rows=rows.filter(r=>String(r.nr??'').startsWith(q)||(r.c.nazwa||'').toLowerCase().includes(q));
+  const sk=S.g1s.k,sd=S.g1s.d,sv=r=>sk==='al'?(r.al?r.al.sev:0):sk==='nr'?(r.nr??1e9):r[sk];
+  rows.sort((a,b)=>{const x=sv(a),y=sv(b);if(x==null&&y==null)return(a.nr??1e9)-(b.nr??1e9);if(x==null)return 1;if(y==null)return -1;return(x-y)*sd||(a.nr??1e9)-(b.nr??1e9)});
+  const sg=v=>v==null?'–':(v>=0?'+':'')+fNum(v);
+  const cell=(r,k)=>{switch(k){
+    case'nr':return`<td><span class="ltd ${r.lt?'lt-'+r.lt:''}"></span><b>${esc(r.nr??'?')}</b>${stBadge(r.c)} <span class="muted">${esc(r.c.nazwa||'')}</span></td>`;
+    case'dim':return`<td class="n">${r.dim??'–'}</td>`;
+    case'lim':return`<td class="n ${r.limSrc==='est'?'est':''}" title="${r.limSrc==='est'?'Szacunek: największe dzienne pobranie z 7 dni (brak odczytu planu dawek)':'Limit z planu dawek w Infodexie dla dnia laktacji krowy'}">${r.lim!=null?(r.limSrc==='est'?'~':'')+fNum(r.lim):'–'}</td>`;
+    case'fy':return`<td class="n">${fNum(r.fy)}</td>`;
+    case'f7':return`<td class="n">${fNum(r.f7)}</td>`;
+    case'use':return`<td class="n ${useCls(r.use)}">${r.use!=null?fNum(r.use,0)+'%':'–'}</td>`;
+    case'my':return`<td class="n">${fNum(r.my)}</td>`;
+    case'm7':return`<td class="n"><b>${fNum(r.m7)}</b></td>`;
+    case'trend':return`<td class="n ${r.trend!=null&&r.trend<=-2?'bad':r.trend>=1?'pos':''}">${r.trend==null?'–':(r.trend>0.3?'▲ ':r.trend<-0.3?'▼ ':'')+sg(r.trend)}</td>`;
+    case'ecm':return`<td class="n" title="${r.ecmD?'Próbny dój '+fDate(r.ecmD):'Brak próbnego doju w tej laktacji'}">${r.ecm!=null?`${fNum(r.ecm)} <small class="muted">${fD2(r.ecmD)}</small>`:'–'}</td>`;
+    case'eff':return`<td class="n">${fNum(r.eff)}</td>`;
+    case'rumT':return`<td class="n ${r.rumT!=null&&r.rumT<=-s.alertRum?'bad':r.rumT!=null&&r.rumT<=-10?'warn':''}">${r.rumT==null?'–':(r.rumT>=0?'+':'')+fNum(r.rumT,0)+'%'}</td>`;
+    case'al':return`<td class="n">${r.al?`<span class="${r.al.sev>=3?'bad':'warn'}" title="${esc(r.al.reasons.map(x=>x.t).join('; '))}">⚠ ${r.al.reasons.length}</span>`:''}</td>`;
+  }};
+  const A=l=>{const v=l.filter(x=>x!=null&&!isNaN(x));return v.length?avg(v):null};
+  const tot={nr:null,dim:A(rows.map(r=>r.dim)),lim:A(rows.map(r=>r.lim)),fy:A(rows.map(r=>r.fy)),f7:A(rows.map(r=>r.f7)),use:A(rows.map(r=>r.use)),my:A(rows.map(r=>r.my)),m7:A(rows.map(r=>r.m7)),trend:A(rows.map(r=>r.trend)),ecm:A(rows.map(r=>r.ecm)),eff:A(rows.map(r=>r.eff)),rumT:A(rows.map(r=>r.rumT))};
+  const st=all.filter(r=>r.f7>0),sumF=st.reduce((a,r)=>a+r.f7,0),sumM=st.reduce((a,r)=>a+(r.m7||0),0);
+  const low=all.filter(r=>r.use!=null&&r.use<s.limitZolty).length,nWrong=all.filter(r=>r.wrong).length,nNone=all.filter(r=>!(r.f7>0)).length;
+  const planTxt=!IX.feed?'<b>Brak planu dawek w danych.</b> Limit to szacunek (~): największe dzienne pobranie z ostatnich 7 dni. Plan dawek pojawi się po uruchomieniu nowego agenta (wersja 1.2) na komputerze w oborze.'
+    :!P||!P.ok?`<b>Plan dawek jest w danych, ale nie udało się go pewnie odczytać</b>${P&&P.n?` (porównanie z pobraniem u ${P.n} krów)`:''}. Limit to szacunek (~): największe dzienne pobranie z 7 dni. Wyślij zrzut sekcji „Dane źródłowe planu dawek” na dole, a poprawię odczyt.`
+    :`Limit z planu dawek w Infodexie, liczony dla dnia laktacji krowy (odczyt sprawdzony na ${P.n} krowach, plan średnio ${fNum(P.ratio*100,0)}% zgodny z pobraniem). Odczyt planu jest nowy: porównaj kilka krów z ekranem Infodexu.`;
+  const fl=[['all','Wszystkie'],['low',`Poniżej ${s.limitZolty}% limitu (${low})`],['none',`Bez paszy 7 dni (${nNone})`],['alert','Z alertem'],['wrong',`Poza Grupą 1 (${nWrong})`]];
+  el.innerHTML=`<div class="tiles">
+    <div class="tile"><span class="muted">Krowy w tabeli</span><b>${all.length}</b><span class="sub">Grupa 1${nWrong?` + ${nWrong} poza grupą, ale jedzą ze stacji`:''}</span></div>
+    <div class="tile"><span class="muted">Pasza ze stacji (śr. 7 dni)</span><b>${fNum(sumF,0)} kg/dzień</b><span class="sub">${st.length} krów, średnio ${fNum(st.length?sumF/st.length:null)} kg</span></div>
+    <div class="tile ${tot.use!=null&&tot.use<s.limitZolty?'warnt':''}"><span class="muted">Wykorzystanie limitu</span><b>${tot.use!=null?fNum(A(all.map(r=>r.use)),0)+'%':'–'}</b><span class="sub">poniżej ${s.limitZolty}%: ${low} krów</span></div>
+    <div class="tile"><span class="muted">Efektywność stacji</span><b>${fNum(sumF?sumM/sumF:null)} kg</b><span class="sub">mleka na 1 kg paszy ze stacji (krowy ze stacji)</span></div>
+  </div>
+  <div class="card"><div class="row"><h2 style="margin:0">Grupa 1 – stacja paszowa, mleko i przeżuwanie</h2><span class="spacer"></span><button class="btn sm" id="g1Xls">Eksport do Excela</button></div>
+    <p class="muted">Dane z Infodexu do ${fDate(R)}. Kliknij krowę, żeby otworzyć jej kartę, a nagłówek kolumny, żeby posortować.</p>
+    <div class="board-bar" style="margin:8px 0"><input type="search" id="g1q" placeholder="Szukaj: nr, nazwa" value="${esc(S.g1q)}"><div class="chips">${fl.map(([k,n])=>`<button class="btn sm${S.g1f===k?' pri':''}" data-g1f="${k}">${n}</button>`).join('')}</div></div>
+    <div class="tbl-wrap"><table class="g1t"><thead><tr>${G1COLS.map(([k,n,num])=>`<th class="${num?'n':''}" data-g1s="${k}">${n}${sk===k?(sd>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>
+    ${rows.map(r=>`<tr data-k="${esc(r.k)}" class="${r.wrong?'wrong':''}" style="cursor:pointer">${G1COLS.map(([k])=>cell(r,k)).join('')}</tr>`).join('')||`<tr><td colspan="${G1COLS.length}" class="muted">Brak krów w tym widoku.</td></tr>`}
+    ${rows.length>1?`<tr class="tot"><td>Średnia (${rows.length})</td>${G1COLS.slice(1).map(([k])=>k==='al'?'<td></td>':k==='use'?`<td class="n ${useCls(tot.use)}">${tot.use!=null?fNum(tot.use,0)+'%':'–'}</td>`:k==='trend'?`<td class="n">${sg(tot.trend)}</td>`:k==='rumT'?`<td class="n">${tot.rumT==null?'–':(tot.rumT>=0?'+':'')+fNum(tot.rumT,0)+'%'}</td>`:k==='dim'?`<td class="n">${fNum(tot.dim,0)}</td>`:`<td class="n">${fNum(tot[k])}</td>`).join('')}</tr>`:''}
+    </tbody></table></div>
+    <p class="muted" style="margin-top:8px">${planTxt}</p>
+    <details style="margin-top:6px"><summary><b>Jak czytać kolumny</b></summary><div class="hist" style="margin-top:6px">
+      <div><b>Limit</b> – dzienna dawka paszy przypisana krowie na stacji. <b>Wykorzystanie limitu</b> – średnie pobranie z 7 dni podzielone przez limit (<span class="u-a">żółte</span> poniżej ${s.limitZolty}%, <span class="u-r">czerwone</span> poniżej ${s.limitCzerwony}%; próg zmienisz w Ustawieniach). Krowa, która nie wyjada dawki, może mieć problem zdrowotny, za wysoki limit albo kłopot z dostępem do stacji.</div>
+      <div><b>Trend mleka</b> – średnia z ostatnich 7 dni minus średnia z 7 dni wcześniej (kg).</div>
+      <div><b>ECM</b> – mleko standaryzowane z ostatniego próbnego doju w tej laktacji (data obok). Infodex nie mierzy składu mleka, więc ECM jest z SOL i odświeża się raz w miesiącu.</div>
+      <div><b>kg mleka / kg paszy</b> – mleko (śr. 7 dni) na 1 kg paszy ze stacji. Obejmuje też mleko z TMR, więc porównuj krowy między sobą i w czasie, a nie z normą.</div>
+      <div><b>Przeżuwanie 7 dni</b> – mediana z ostatnich 7 dni względem 7 dni wcześniej, z obroży (wartości względne).</div>
+      <div><b>Alerty</b> – te same co w zakładce Dziś (spadek mleka, przeżuwania, ruchu). Najedź na ikonę, żeby zobaczyć powód.</div>
+      <div>Czerwone wiersze i <span class="stb bad">S!</span> – krowa pobiera paszę ze stacji, a w aplikacji nie jest w Grupie 1.</div></div></details>
+    ${IX.feed?`<details style="margin-top:6px"><summary>Dane źródłowe planu dawek (dla serwisu)</summary><div class="muted" style="margin-top:6px">${Object.entries(P?P.rows:{}).map(([k,n])=>`${esc(k)}: ${n} wierszy`).join(' · ')} · numer krowy w planie: ${P&&P.mode==='db'?'DbId':'Id'} · mnożnik: ${P?P.scale:'–'} · zgodność: ${P&&P.ratio!=null?fNum(P.ratio,2):'–'}</div>
+      ${Object.entries(IX.feed.tables||{}).map(([k,v])=>`<div style="margin-top:6px"><b>${esc(k)}</b><pre style="max-height:160px;overflow:auto;font-size:11px;background:#F6F8F4;padding:6px;border-radius:6px">${esc(String(v).split('\n').slice(0,25).join('\n'))}</pre></div>`).join('')}</details>`:''}
+  </div>`;
+  const qi=$('#g1q');qi.oninput=()=>{S.g1q=qi.value;const p=qi.selectionStart;render();const n=$('#g1q');n.focus();n.setSelectionRange(p,p)};
+  document.querySelectorAll('[data-g1f]').forEach(b=>b.onclick=()=>{S.g1f=b.dataset.g1f;render()});
+  document.querySelectorAll('[data-g1s]').forEach(th=>th.onclick=()=>{const k=th.dataset.g1s;S.g1s=S.g1s.k===k?{k,d:-S.g1s.d}:{k,d:k==='nr'?1:-1};render()});
+  document.querySelectorAll('.g1t tbody tr[data-k]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('[data-ix]'))return;cowSheet(tr.dataset.k)});
+  $('#g1Xls').onclick=()=>{
+    const data=rows.map(r=>({'Nr':r.nr,'Nazwa':r.c.nazwa||'','Typ':LTN[r.lt]||'','Grupa':GR[gOf(r.c)].n,'Dzień laktacji':r.dim,'Laktacja':r.lakt,
+      'Limit kg':r.lim!=null?+r.lim.toFixed(2):null,'Limit źródło':r.limSrc==='plan'?'plan Infodex':r.limSrc==='est'?'szacunek':'',
+      'Pobrała wczoraj kg':r.fy!=null?+r.fy.toFixed(2):null,'Pobranie śr. 7 dni kg':r.f7!=null?+r.f7.toFixed(2):null,'Wykorzystanie limitu %':r.use!=null?Math.round(r.use):null,
+      'Mleko wczoraj kg':r.my,'Mleko śr. 7 dni kg':r.m7!=null?+r.m7.toFixed(1):null,'Trend mleka kg':r.trend!=null?+r.trend.toFixed(1):null,
+      'ECM kg':r.ecm!=null?+r.ecm.toFixed(1):null,'ECM data PD':r.ecmD||'','kg mleka/kg paszy':r.eff!=null?+r.eff.toFixed(2):null,
+      'Przeżuwanie zmiana %':r.rumT!=null?Math.round(r.rumT):null,'Alerty':r.al?r.al.reasons.map(x=>x.t).join('; '):''}));
+    const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Grupa 1');
+    XLSX.writeFile(wb,`grupa1_stacja_${R}.xlsx`);
+  };
 }
 const zmiany=()=>(S.farm.zmianyDawki||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
 async function saveZmiany(list){
