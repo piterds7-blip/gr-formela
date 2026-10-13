@@ -122,6 +122,7 @@ label.f input,label.f select{color:var(--c-txt);font-size:15px}
 .ltd.lt-p{background:var(--lt-p)}.ltd.lt-w{background:var(--lt-w)}.ltd.lt-z{background:var(--lt-z)}
 .ltb{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;color:#fff}
 .ltb.lt-p{background:var(--lt-p)}.ltb.lt-w{background:var(--lt-w)}.ltb.lt-z{background:var(--lt-z)}
+.heat{border-left:6px solid #C2185B}.heat.none{border-left-color:var(--c-pri);padding:10px 16px}.heat-ic{font-size:22px;font-weight:800;color:#C2185B;width:28px;text-align:center}.heat.none .heat-ic{color:var(--c-pri)}.heat .aitem{border-left-color:#C2185B}
 .stwarn{border-color:#E6B8B2;background:var(--c-red-bg)}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .u-r{color:var(--c-red);font-weight:700}.u-a{color:#9A7406;font-weight:700}.u-g{color:var(--c-pri);font-weight:700}
@@ -285,7 +286,7 @@ const firebaseConfig={
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.6.0';
+const APP_VER='0.6.1';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
@@ -1060,7 +1061,7 @@ function renderUst(){
     <div class="row"><button class="btn" id="bkExp">Pobierz kopię (JSON)</button><label class="btn">Wczytaj kopię<input type="file" id="bkImp" accept=".json" hidden></label></div>
     <p class="muted" style="margin-top:12px">GR Formela, wersja ${APP_VER}</p></div>
   <div class="card"><h2>Dane z Infodexu</h2>
-    <p class="muted">Agent na komputerze w oborze wysyła dane sam, codziennie o 23:59. Grupy ani notatki nie są ruszane.</p>
+    <p class="muted">Agent na komputerze w oborze wysyła dane sam, codziennie o 6:00 i 17:00. Grupy ani notatki nie są ruszane.</p>
     <p class="muted" id="ixStatus">Sprawdzam ostatnią aktualizację…</p>
     <p class="muted" style="margin-top:10px"><b>Awaryjnie, bez internetu w oborze:</b> wczytaj plik <b>infodex_export.json</b> zrobiony przez EKSPORT_do_pliku.bat.</p>
     <div class="row"><label class="btn">Wczytaj plik z Infodexu<input type="file" id="ixFile" accept=".json" hidden></label></div>
@@ -1138,8 +1139,8 @@ async function ixLoad(){
           const [h,e,fd]=await Promise.all([fr.collection('ix').doc('herd').get(),fr.collection('ix').doc('events').get(),fr.collection('ix').doc('feed').get()]);
           const known=Object.keys(days).sort();
           let q=fr.collection('ix_days');
-          // agent wysyła 7 ostatnich dni – pobieram tylko je (mniej odczytów z bazy)
-          if(kv.meta&&known.length)q=q.where('date','>=',addDays(known[known.length-1],-8));
+          // agent wysyła 10 ostatnich dni – pobieram tylko je (mniej odczytów z bazy)
+          if(kv.meta&&known.length)q=q.where('date','>=',addDays(known[known.length-1],-11));
           const ds=await q.get();
           const nd={};ds.forEach(x=>{nd[x.id]=x.data()});
           Object.assign(days,nd);
@@ -1242,7 +1243,7 @@ function ixRepro(id){
 function ixLact(id){
   const D=IX.d;if(D.lact[id])return D.lact[id];
   const ser=D.ser[id]||{},segs=[];
-  for(const dt of Object.keys(ser).sort()){
+  for(const dt of Object.keys(ser).sort()){if(dt>D.ref)continue;
     const r=ser[dt];if(!r.m||r.dim==null||r.dim<0)continue;
     const cd=addDays(dt,-r.dim);
     let sg=segs[segs.length-1];
@@ -1346,6 +1347,67 @@ function ixAlerts(){
   heats.sort((a,b)=>b.ch-a.ch);
   return{list,heats,un:(D.herdDay[R]||{}).un||0};
 }
+/* ================== RUJA: aktywność z ostatnich 12 godzin (kroki co 2 h) ================== */
+/* Porównuję kroki z ostatnich 12 h z tymi samymi godzinami w 7 poprzednich dniach (każda krowa ze swoją normą).
+   Bez danych co 2 h (stary agent) – reguła dobowa z ixAlerts. */
+function ixHeats(){
+  const D=IX.d,herd=ixCows(),T=todayISO();
+  // najnowszy zapis kroków w stadzie
+  let T0=null;
+  for(const d of [...D.dates].reverse().slice(0,3)){
+    const c=(IX.days[d]||{}).c||{};let mi=-1;
+    for(const id in c){const sa=c[id].sa;if(!sa)continue;for(let i=11;i>mi;i--)if(sa[i]!=null){mi=i;break}}
+    if(mi>=0){T0={d,i:mi};break}
+  }
+  if(!T0)return{mode:'day',list:ixAlerts().heats.map(h=>({...h,daily:true})),T0:null};
+  const slot=(ser,d,i)=>{while(i<0){i+=12;d=addDays(d,-1)}while(i>11){i-=12;d=addDays(d,1)}const sa=ser[d]&&ser[d].sa;return sa?sa[i]:null};
+  const win=(ser,d,i,n)=>{let s=0,k=0;for(let j=0;j<n;j++){const v=slot(ser,d,i-j);if(v!=null){s+=v;k++}}return k>=n-1?s*n/k:null};
+  const list=[];
+  for(const id in herd){
+    const h=herd[id];if(h.state===2||h.state===3)continue;
+    const ser=D.ser[id]||{};
+    const cur=win(ser,T0.d,T0.i,6);if(cur==null)continue;
+    const base=[1,2,3,4,5,6,7].map(k=>win(ser,addDays(T0.d,-k),T0.i,6)).filter(v=>v!=null);
+    if(base.length<4)continue;
+    const bm=med(base);if(!(bm>0))continue;
+    const ratio=cur/bm;
+    if(!(ratio>=1.7&&cur-bm>=40))continue;
+    // początek wzrostu: idę wstecz od najnowszego zapisu, dopóki 2-godzinne okresy są podwyższone (1 przerwa dozwolona)
+    let on=null,gap=0;
+    for(let j=0;j<12;j++){
+      const v=slot(ser,T0.d,T0.i-j);
+      const sm=med([1,2,3,4,5,6,7].map(k=>slot(ser,addDays(T0.d,-k),T0.i-j)).filter(x=>x!=null));
+      const up=v!=null&&sm!=null&&v>=Math.max(sm*1.8,sm+8);
+      if(up){on=j;gap=0}else if(++gap>1)break;
+    }
+    let od=T0.d,oi=T0.i-(on??0);while(oi<0){oi+=12;od=addDays(od,-1)}
+    const onset=`${od}T${String(oi*2).padStart(2,'0')}:00`;
+    const rp=ixRepro(id);
+    const since=rp.lastIns?dayDiff(rp.lastIns,T):null;
+    if(since!=null&&since<=2)continue;
+    const dimv=(()=>{const x=ixLacId(id);return x&&x.cd?dayDiff(x.cd,T):h.dim})();
+    list.push({id,ratio,cur,bm,onset,rp,dim:dimv,since});
+  }
+  list.sort((a,b)=>b.ratio-a.ratio);
+  return{mode:'h',list,T0};
+}
+const hhmm=iso=>iso.slice(11,16);
+const addH=(iso,h)=>{const t=new Date(iso+':00');t.setHours(t.getHours()+h);const p=n=>String(n).padStart(2,'0');return `${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())}T${p(t.getHours())}:00`};
+function heatCard(H){
+  const s=S.farm.settings,T=todayISO();
+  const dn=iso=>{const d=iso.slice(0,10);return d===T?'dziś':d===addDays(T,-1)?'wczoraj':d===addDays(T,1)?'jutro':fD2(d)};
+  const tl=H.T0?`${dn(H.T0.d)} ok. ${String(H.T0.i*2+2).padStart(2,'0')}:00`:'';
+  if(!H.list.length)return `<div class="card heat none"><div class="row"><span class="heat-ic">♀</span><div><b>Ruja: brak podejrzeń</b><div class="muted">${H.mode==='h'?`Aktywność sprawdzona do ${tl}.`:'Sprawdzone na danych dobowych.'} Infodex ma też własne alerty rui.</div></div></div></div>`;
+  return `<div class="card heat"><div class="row"><span class="heat-ic">♀</span><h2 style="margin:0">Podejrzenie rui (${H.list.length})</h2><span class="spacer"></span><span class="muted">${H.mode==='h'?`aktywność do ${tl}`:'dane dobowe'}</span></div>
+    <p class="muted" style="margin:6px 0 4px">${H.mode==='h'?'Kroki z ostatnich 12 godzin wyraźnie wyższe niż w tych samych godzinach przez ostatni tydzień. ':'Kroki z całej doby wyraźnie wyższe niż zwykle. '}Krowy cielne i zasuszone pomijam. Sprawdź krowę w oborze i porównaj z alertem rui w Infodexie.</p>
+    <div class="alist">${H.list.map(h=>{
+      const okno=h.onset?`${dn(addH(h.onset,8))} ${hhmm(addH(h.onset,8))} – ${dn(addH(h.onset,16))} ${hhmm(addH(h.onset,16))}`:'';
+      const early=h.dim!=null&&h.dim<s.vwp;
+      return `<div class="aitem s3">${nrLink(h.id)}<div class="ar">
+        <div class="rs r">${h.daily?`kroki +${h.ch}% w dobie (${h.st} wobec zwykle ${Math.round(h.sm)})`:`aktywność ×${fNum(h.ratio,1)} względem jej normy, wzrost od ok. ${hhmm(h.onset)} (${dn(h.onset)})`}</div>
+        ${okno?`<div class="rs"><b>Inseminacja najlepiej: ${okno}</b> <span class="muted">(8–16 h od początku wzrostu)</span></div>`:''}
+        <div class="muted">${esc(h.rp.stTxt)}${h.dim!=null?`, dzień laktacji ${h.dim}`:''}${early?` <b class="warn">(przed ${s.vwp}. dniem – okres spoczynku)</b>`:''}${h.rp.insCount?`, inseminacji w tej laktacji: ${h.rp.insCount}`:''}${h.since!=null?`, ostatnia ${h.since} dni temu`:''}</div></div></div>`}).join('')}</div></div>`;
+}
 function ixCalendar(){
   const s=S.farm.settings,herd=ixCows(),T=todayISO(),end=addDays(T,14);
   const items=[],ready=[],ptDue=[],late=[];
@@ -1445,10 +1507,11 @@ function ixNoData(){
   <div class="row">${ixFileInput('ixFile','Wczytaj plik z Infodexu',false)}</div><div id="ixProg" class="muted" style="margin-top:8px"></div></div>`;
 }
 function freshBar(){
-  const D=IX.d,age=D.ref?dayDiff(D.ref,todayISO()):null;
-  const old=age!=null&&age>2;
-  return `<div class="fresh${old?' old':''}"><span>Dane z Infodexu do <b>${fDate(D.ref)}</b>${age!=null?` (${age===0?'dziś':age===1?'wczoraj':age+' dni temu'})`:''}</span><span class="spacer"></span>
-    ${old?`<span class="muted">Agent z obory nie wysłał danych od ${age-1} dni. Sprawdź, czy komputer w oborze jest włączony i ma internet. Awaryjnie wczytaj plik.</span>${ixFileInput('ixFile','Wczytaj plik',false)}`:''}</div><div id="ixProg" class="muted"></div>`;
+  const D=IX.d,at=(IX.meta&&IX.meta.at)||'',atD=at.slice(0,10);
+  const age=atD?dayDiff(atD,todayISO()):null;
+  const old=age!=null&&age>=2;
+  return `<div class="fresh${old?' old':''}"><span>Dane z Infodexu: pełne dni do <b>${fDate(D.ref)}</b>${at?` · ostatnia wysyłka z obory <b>${fD2(atD)} ${esc(at.slice(11,16))}</b>`:''}</span><span class="spacer"></span>
+    ${old?`<span class="muted">Agent z obory nie wysłał danych od ${age} dni. Sprawdź, czy komputer w oborze jest włączony i ma internet. Awaryjnie wczytaj plik.</span>${ixFileInput('ixFile','Wczytaj plik',false)}`:''}</div><div id="ixProg" class="muted"></div>`;
 }
 function hiddenKey(){return 'grformela.ok.'+IX.d.ref}
 function getHidden(){try{return new Set(JSON.parse(localStorage.getItem(hiddenKey())||'[]'))}catch(e){return new Set()}}
@@ -1468,13 +1531,14 @@ function renderDzis(){
   const dayName=d=>d===T?'Dziś':d===addDays(T,1)?'Jutro':`${wday(d)} ${fD2(d)}`;
   const byDay={};C.items.forEach(x=>{(byDay[x.d]=byDay[x.d]||[]).push(x)});
   const ptNow=C.ptDue.filter(x=>x.days<=60),ptOld=C.ptDue.filter(x=>x.days>60);
-  const wr=stWrong();
+  const wr=stWrong(),H=ixHeats();
   $('#main').innerHTML=`${freshBar()}
+  ${heatCard(H)}
   ${wr.length?`<div class="card stwarn"><div class="row"><span class="stb bad">S!</span><div><b>Sprawdź przypisanie do grupy (${wr.length}):</b> pobierają paszę ze stacji, a w aplikacji nie są w Grupie 1.<div class="ids" style="margin-top:6px">${wr.map(c=>nrLink(lac(c).id)).join('')}</div></div><span class="spacer"></span><button class="btn sm" onclick="goTab('grupy')">Popraw w Grupach</button></div></div>`:''}
   <div class="tiles">
     <div class="tile"><span class="muted">Mleko stada ${fD2(R)}</span><b>${fNum(hd.tot,0)} kg</b><span class="sub">${arrow(dTot)} względem średniej z 7 dni (${fNum(t7,0)} kg)</span></div>
     <div class="tile"><span class="muted">Średnio na krowę</span><b>${fNum(hd.avg)} kg</b><span class="sub">${dAvg==null?'':(dAvg>=0?'+':'')+fNum(dAvg)+' kg'} · dojonych ${hd.cows||0}</span></div>
-    <div class="tile ${shown.length?'warnt':''}"><span class="muted">Do sprawdzenia</span><b>${shown.length}</b><span class="sub">${A.heats.length?`podejrzenie rui: ${A.heats.length}`:'krów z alertem'}</span></div>
+    <div class="tile ${shown.length?'warnt':''}"><span class="muted">Do sprawdzenia</span><b>${shown.length}</b><span class="sub">krów z alertem</span></div>
     <div class="tile" id="wxTile"><span class="muted">Upał (THI) – prognoza</span><b>…</b><span class="sub">ładuję pogodę</span></div>
   </div>
   <div class="card"><div class="row"><h3 style="margin:0">Mleko stada – 30 dni</h3><span class="spacer"></span><span class="muted">kliknij punkt, żeby zobaczyć wartość</span></div><div class="chart-box sm"><canvas id="chHerd"></canvas></div>
@@ -1483,8 +1547,7 @@ function renderDzis(){
     <p class="muted">Porównanie z <b>własną normą krowy</b> z poprzednich 7 dni. Kliknij numer, żeby otworzyć kartę krowy.</p>
     ${shown.length?`<div class="alist">${shown.map(a=>`<div class="aitem s${Math.min(a.sev,4)}">${nrLink(a.id)}<div class="ar">${a.reasons.map(r=>`<div class="rs ${r.c}">${esc(r.t)}</div>`).join('')}<div class="muted">${grpOf(a.id)} ${a.dim!=null?`dzień laktacji ${a.dim}`:''}</div></div><button class="btn sm" data-ok="${esc(a.id)}" title="Ukryj do następnego dnia danych">Sprawdzone</button></div>`).join('')}</div>`:'<p>Wszystkie krowy w normie. 👍</p>'}
   </div>
-  <div class="grid-2">
-    <div class="card"><h2>Kalendarz – 14 dni</h2>
+  <div class="card"><h2>Kalendarz – 14 dni</h2>
       ${C.late.length?`<div class="late"><b>Zasuszenie zaległe (${C.late.length})</b><div class="muted">Cielne, do wycielenia mniej niż ${s.dniZasuszenia} dni, a wciąż dojone. Liczba przy numerze to dni opóźnienia.</div><div class="ids" style="margin-top:6px">${C.late.map(x=>nrLink(x.id,` <small>${dayDiff(x.d,T)} d.</small>`)).join('')}</div></div>`:''}
       ${Object.keys(byDay).length?Object.entries(byDay).map(([d,l])=>`<div class="cal-d${d<T?' past':''}"><b>${dayName(d)}</b><div>${l.map(x=>`<div class="cal-i ${x.t}">${nrLink(x.id)} ${esc(x.txt)}</div>`).join('')}</div></div>`).join(''):'<p class="muted">Nic zaplanowanego na najbliższe 14 dni.</p>'}
       <h3 style="margin-top:14px">Do badania ciąży (${ptNow.length})</h3>
@@ -1495,11 +1558,7 @@ function renderDzis(){
       ${C.ready.length?`<div class="ids">${C.ready.map(x=>nrLink(x.id,` <small${x.dim>150?' class="bad"':''}>${x.dim} d.</small>`)).join('')}</div>`:'<p class="muted">Brak.</p>'}
       <p class="muted" style="margin-top:10px">Wycielenia liczone od ostatniej inseminacji + ${s.ciaza} dni (lub z planowanej daty wpisanej w karcie krowy). Zasuszenie ${s.dniZasuszenia} dni przed.</p>
     </div>
-    <div class="card"><h2>Podejrzenie rui (${A.heats.length})</h2>
-      <p class="muted">Wyraźnie więcej kroków niż zwykle u krowy, która nie jest cielna. Infodex ma własne alerty rui. To jest dodatkowa kontrola, czy ruje nie uciekają.</p>
-      ${A.heats.length?`<div class="alist">${A.heats.map(h=>`<div class="aitem s2">${nrLink(h.id)}<div class="ar"><div class="rs a">kroki +${h.ch}% (${h.st} wobec zwykle ${Math.round(h.sm)})</div><div class="muted">${esc(h.rp.stTxt)}${h.dim!=null?`, dzień laktacji ${h.dim}`:''}${h.since!=null?`, ostatnia inseminacja ${h.since} dni temu`:''}</div></div></div>`).join('')}</div>`:'<p class="muted">Brak.</p>'}
-    </div>
-  </div>`;
+`;
   bindIxFile();
   document.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>{const h=getHidden();h.add(b.dataset.ok);setHidden(h);renderDzis()});
   const sh=$('#showHid');if(sh)sh.onclick=()=>{setHidden(new Set());renderDzis()};
