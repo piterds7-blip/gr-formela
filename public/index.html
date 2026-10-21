@@ -158,6 +158,9 @@ tbody tr:hover{background:#F7FAF6;cursor:pointer}
 .kpi b{display:block;font-size:22px}
 .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
 .chart-box{position:relative;height:320px}
+.wlg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:#5E6B60;margin:6px 0 8px}.wlg>span{display:flex;align-items:center;gap:6px}
+.wl-d{display:inline-block;width:11px;height:11px;border-radius:50%}.wl-l{display:inline-block;width:20px;border-top:2px solid #5E6B60}.wl-l.dash{border-top-style:dashed}.wl-l.red{border-top-color:#C0392B}
+tr.avgr td{border-top:2px solid #CFD8CC}tr.avgr+tr.avgr td{border-top:1px solid #E3E8E1}
 .alerts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
 .alert{border-left:4px solid var(--c-gold);background:#fff;border-radius:6px;padding:10px 12px;border:1px solid var(--c-brd);border-left-width:4px}
 .alert.r{border-left-color:var(--c-red)}
@@ -286,7 +289,7 @@ const firebaseConfig={
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.6.1';
+const APP_VER='0.6.2';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
@@ -861,6 +864,23 @@ function stadoRows(){
   const col=STADO_COLS.find(x=>x[0]===S.stadoSort.k),f=col[2],dir=S.stadoSort.d;
   return l.sort((a,b)=>{const x=f(a),y=f(b);if(x===y)return 0;if(x===null||x===undefined||x==='')return 1;if(y===null||y===undefined||y==='')return -1;return(x>y?1:-1)*dir});
 }
+function stadoAvgRows(rows){
+  const s=S.farm.settings;
+  const parts=S.stadoG==='all'?[['g1','Średnia G1'],['g2','Średnia G2']]:[[null,S.stadoG==='g1'?'Średnia G1':S.stadoG==='g2'?'Średnia G2':'Średnia']];
+  return parts.map(([g,lab])=>{
+    const l=g?rows.filter(c=>gOf(c)===g):rows;if(!l.length)return'';
+    const pv=k=>l.map(c=>c.ostPd&&c.ostPd[k]).filter(v=>v!=null&&!isNaN(v));
+    const dv=l.filter(c=>!lac(c).zas).map(dim).filter(v=>v!=null&&!isNaN(v));
+    const kg=pv('kg'),tl=pv('tl'),bi=pv('bi'),tb=pv('tb'),moc=pv('moc'),lks=pv('lks');
+    const a=v=>v.length?avg(v):null,A={dim:a(dv),kg:a(kg),tl:a(tl),bi:a(bi),tb:a(tb),moc:a(moc),lks:a(lks)};
+    const nHi=lks.filter(v=>v>s.lksProg).length;
+    return`<tr class="tot avgr"><td colspan="6">${lab} <span class="muted" style="font-weight:400">n=${kg.length||l.length}${kg.length&&kg.length<l.length?` z ${l.length} (bez wyniku PD: ${l.length-kg.length})`:''}</span></td>
+      <td class="n">${fNum(A.dim,0)}</td><td class="n">${fNum(A.kg)}</td><td class="n">${fNum(A.tl,2)}</td>
+      <td class="n ${A.bi!=null&&A.bi<s.biMin?'warn':''}">${fNum(A.bi,2)}</td>
+      <td class="n ${A.tb!=null&&(A.tb>s.tbKetoza||A.tb<s.tbSara)?'bad':''}">${fNum(A.tb,2)}</td>
+      <td class="n ${A.moc!=null&&(A.moc<s.mocMin||A.moc>s.mocMax)?'warn':''}">${fNum(A.moc,0)}</td>
+      <td class="n ${A.lks>s.lksProg?'bad':''}">${fNum(A.lks,0)}${lks.length?`<div class="muted" style="font-weight:400;font-size:11px;white-space:nowrap">med. ${fNum(med(lks),0)} · ${nHi} szt. &gt;${s.lksProg}</div>`:''}</td><td></td></tr>`}).join('');
+}
 function renderStado(){
   const s=S.farm.settings,rows=stadoRows();
   const cell=(c,k)=>{const p=c.ostPd||{};switch(k){
@@ -885,7 +905,8 @@ function renderStado(){
     <div class="row">${fl.map(([k,n])=>`<button class="btn sm${S.stadoG===k?' pri':''}" data-fg="${k}">${n}</button>`).join('')}</div>
     <span class="spacer"></span><span class="muted">${rows.length} krów</span><button class="btn" id="expBtn">Eksport do Excela</button></div>
   <div class="tbl-wrap"><table><thead><tr>${STADO_COLS.map(([k,n,,num])=>`<th class="${num?'n':''}" data-sk="${k}">${n}${S.stadoSort.k===k?(S.stadoSort.d>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
-  <tbody>${rows.map(c=>`<tr data-k="${esc(c.kolczyk)}">${STADO_COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="14" class="muted">Brak krów w tym widoku.</td></tr>`}</tbody></table></div>
+  <tbody>${rows.map(c=>`<tr data-k="${esc(c.kolczyk)}">${STADO_COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="14" class="muted">Brak krów w tym widoku.</td></tr>`}
+  ${stadoAvgRows(rows)}</tbody></table></div>
   ${lacLegend()}<p class="muted">Laktacja, wycielenie i dzień laktacji: ${ixHas()?'z Infodexu (bieżące)':'z próbnego doju'}. Wartości składu mleka pochodzą z ostatniego wgranego próbnego doju. Kolorem oznaczone wartości poza normami z Ustawień.</p>`;
   const q=$('#q');q.oninput=()=>{S.q=q.value;const p=q.selectionStart;renderStado();const n=$('#q');n.focus();n.setSelectionRange(p,p)};
   document.querySelectorAll('[data-fg]').forEach(b=>b.onclick=()=>{S.stadoG=b.dataset.fg;renderStado()});
@@ -1647,14 +1668,14 @@ function ixCowSection(el,id){
 }
 
 /* ================== ZAKŁADKA: ŻYWIENIE ================== */
-const ZSEC=[['g1','Grupa 1 – stacja'],['krzywe','Krzywe laktacji'],['stacja','Stacja paszowa'],['sklad','Skład mleka (ECM)'],['upal','Upał'],['dawka','Zmiany dawki']];
+const ZSEC=[['g1','Grupa 1 – stacja'],['wyd','Wydajność'],['krzywe','Krzywe laktacji'],['stacja','Stacja paszowa'],['sklad','Skład mleka (ECM)'],['upal','Upał'],['dawka','Zmiany dawki']];
 function renderZyw(){
   if(!ixHas()){$('#main').innerHTML=ixNoData();bindIxFile();return}
   ixL();
   if(!S.zSec)S.zSec='g1';
   $('#main').innerHTML=`<div class="seg no-print">${ZSEC.map(([k,n])=>`<button data-z="${k}" class="${S.zSec===k?'on':''}">${n}</button>`).join('')}</div><div id="zBody"></div>`;
   document.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{S.zSec=b.dataset.z;render()});
-  ({g1:zG1,dawka:zDawka,krzywe:zKrzywe,stacja:zStacja,sklad:zSklad,upal:zUpal})[S.zSec]($('#zBody'));
+  ({g1:zG1,wyd:zWyd,dawka:zDawka,krzywe:zKrzywe,stacja:zStacja,sklad:zSklad,upal:zUpal})[S.zSec]($('#zBody'));
 }
 /* ---------- plan dawek stacji z Infodexu (FeedingNew → FeedingDayPoints → FeedingInstructions) ---------- */
 const csvT=s=>{if(!s)return[];const L=String(s).split('\n');const h=L[0].split(',');return L.slice(1).filter(x=>x.trim()).map(l=>{const v=l.split(',');const o={};h.forEach((k,i)=>{const x=v[i];o[k]=x===''||x==null?null:(isNaN(+x)?x:+x)});return o})};
@@ -1882,6 +1903,74 @@ function zEdit(z){
     L.push({id,date,opis});if(await saveZmiany(L)){S.zSel=id;closeModal();render()}
   };
   const del=$('#zeDel');if(del)del.onclick=async()=>{if(!confirm('Usunąć tę zmianę?'))return;if(await saveZmiany((S.farm.zmianyDawki||[]).filter(x=>x.id!==z.id))){S.zSel=null;closeModal();render()}};
+}
+/* ---------- Żywienie → Wydajność (mleko × dzień laktacji × pasza ze stacji) ---------- */
+function wydRows(){
+  const D=IX.d,R=D.ref,d7=dRange(addDays(R,-6),R);
+  return activeCows().filter(c=>['g1','g2'].includes(gOf(c))).map(c=>{
+    const L=lac(c),id=L.id;if(!id||L.zas||L.dim==null)return null;
+    const m7=ixMilk7(id);if(m7==null)return null;
+    const ser=D.ser[id]||{},pres=d7.filter(d=>ser[d]&&(ser[d].m>0||ser[d].f>0));
+    const f7=pres.length?avg(pres.map(d=>(ser[d].f||0)/1000)):0;
+    return{k:c.kolczyk,c,nr:c.nr,g:gOf(c),p:lacType(c)==='p',dim:L.dim,m7,f7}
+  }).filter(Boolean);
+}
+const WPH=d=>d<=100?['#1B9E77','do 100 dni']:d<=200?['#D9822B','100–200 dni']:['#6A51C8','ponad 200 dni'];
+function zWyd(el){
+  const s=S.farm.settings,D=IX.d,R=D.ref,C=ixCurves();
+  if(!S.wydG)S.wydG='all';
+  const all=wydRows(),showA=all.filter(r=>S.wydG==='all'||r.g===S.wydG),g1=all.filter(r=>r.g==='g1');
+  const rule=m=>Math.max(0,(m-s.tmrMleko)*s.kgPaszyNaKgMleka);
+  const adult=r=>r.dim>=21,over=g1.filter(r=>adult(r)&&r.f7-rule(r.m7)>1),under=g1.filter(r=>adult(r)&&r.f7-rule(r.m7)<-1);
+  const bins=[[0,30,'0–30'],[31,100,'31–100'],[101,200,'101–200'],[201,1e9,'ponad 200']];
+  const bRow=(lab,l1,l2,cls)=>{const st=l1.filter(r=>r.f7>0),mf=avg(st.map(r=>r.m7)),ff=avg(st.map(r=>r.f7));
+    return`<tr${cls?` class="${cls}"`:''}><td>${lab}</td><td class="n">${l1.length}</td><td class="n">${fNum(avg(l1.map(r=>r.m7)))}</td><td class="n">${fNum(avg(l1.map(r=>r.f7)))}</td><td class="n">${ff>0.2?fNum(mf/ff):'–'}</td><td class="n">${l2.length}</td><td class="n">${fNum(avg(l2.map(r=>r.m7)))}</td><td class="n">${fNum(avg(l2.map(r=>r.dim)),0)}</td></tr>`};
+  const g2=all.filter(r=>r.g==='g2');
+  const dot=(col,shape)=>`<span class="wl-d" style="background:${col};${shape==='t'?'clip-path:polygon(50% 0,100% 100%,0 100%);border-radius:0':''}"></span>`;
+  const fl=[['all','Obie grupy'],['g1','Grupa 1'],['g2','Grupa 2']];
+  el.innerHTML=`<div class="card"><div class="row"><h2 style="margin:0">Mleko a dzień laktacji</h2><span class="spacer"></span><div class="chips">${fl.map(([k,n])=>`<button class="btn sm${S.wydG===k?' pri':''}" data-wg="${k}">${n}</button>`).join('')}</div></div>
+    <p class="muted">Każda kropka to krowa: mleko średnio z 7 dni i dzień laktacji z Infodexu (do ${fDate(R)}). Im większa kropka, tym więcej paszy pobiera ze stacji. Linie to przeciętna krzywa laktacji Twojego stada. Kliknij kropkę, żeby otworzyć kartę krowy.</p>
+    <div class="wlg">
+      <span>${dot('#2F6B3A')}Grupa 1</span><span>${dot('#B08A12')}Grupa 2</span>
+      <span>${dot('#8A948B')}wieloródka</span><span>${dot('#8A948B','t')}pierwiastka</span>
+      <span><span class="wl-l"></span>krzywa stada – wieloródki</span><span><span class="wl-l dash"></span>krzywa stada – pierwiastki</span></div>
+    <div class="chart-box" style="height:360px"><canvas id="wA"></canvas></div>
+    <p class="muted" style="margin-top:8px"><b>Jak czytać:</b> kropki Grupy 1 daleko po prawej i nisko to krowy, które można przenieść do Grupy 2. Kropki Grupy 2 na krzywej lub nad nią doją jak krowy z Grupy 1. Kropki wyraźnie pod krzywą (zwłaszcza w pierwszych 100 dniach) to krowy do sprawdzenia: zdrowie, racice, wyjadanie paszy.</p></div>
+  <div class="card"><h2>Grupa 1: pasza ze stacji a mleko</h2>
+    <p class="muted">Pasza pobrana ze stacji i mleko, średnio z 7 dni. Czerwona linia to Twoja zasada: TMR pokrywa ${s.tmrMleko} kg mleka, a każdy kg ponad to ${fNum(s.kgPaszyNaKgMleka,2)} kg paszy (zmienisz ją w Ustawieniach albo w „Stacja paszowa”).</p>
+    <div class="wlg">${['#1B9E77','#D9822B','#6A51C8'].map((c,i)=>`<span>${dot(c)}${['do 100 dni','100–200 dni','ponad 200 dni'][i]}</span>`).join('')}<span>${dot('#8A948B','t')}pierwiastka</span><span><span class="wl-l red"></span>zasada przydziału</span></div>
+    <div class="chart-box" style="height:340px"><canvas id="wB"></canvas></div>
+    <div class="kpis" style="margin-top:10px">
+      <div class="kpi"><span class="muted">Nad linią (o ponad 1 kg)</span><b>${over.length} krów</b><span class="muted">więcej paszy, niż wynika z mleka</span></div>
+      <div class="kpi"><span class="muted">Pod linią (o ponad 1 kg)</span><b>${under.length} krów</b><span class="muted">mniej paszy, niż wynika z mleka</span></div>
+    </div>
+    <p class="muted" style="margin-top:8px"><b>Jak czytać:</b> zielone kropki nad linią to zwykle celowe rozdajanie na początku laktacji. Fioletowe i pomarańczowe nad linią to krowy, którym można zmniejszyć dawkę. Kropki pod linią przy wysokim mleku mogą potrzebować więcej paszy albo nie wyjadają przydziału (sprawdź „Grupa 1 – stacja”). Krowy do 21 dnia laktacji nie są liczone w kafelkach.</p></div>
+  <div class="card"><h2>Podsumowanie w przedziałach dni laktacji</h2>
+    <div class="tbl-wrap"><table><thead><tr><th>Dni laktacji</th><th class="n">G1 krów</th><th class="n">G1 mleko kg</th><th class="n">G1 stacja kg</th><th class="n">G1 kg mleka / kg paszy</th><th class="n">G2 krów</th><th class="n">G2 mleko kg</th><th class="n">G2 śr. dzień lakt.</th></tr></thead><tbody>
+    ${bins.map(([a,b,lab])=>bRow(lab,g1.filter(r=>r.dim>=a&&r.dim<=b),g2.filter(r=>r.dim>=a&&r.dim<=b))).join('')}
+    ${bRow('Razem',g1,g2,'tot')}</tbody></table></div>
+    <p class="muted" style="margin-top:8px">Mleko i pasza: średnia z 7 dni z Infodexu. „kg mleka / kg paszy” liczę tylko dla krów, które jedzą ze stacji; obejmuje też mleko z TMR, więc porównuj przedziały między sobą i w czasie. Ostatnia kolumna pomaga ocenić, czy w Grupie 2 nie ma krów zbyt wcześnie w laktacji.</p></div>`;
+  document.querySelectorAll('[data-wg]').forEach(b=>b.onclick=()=>{S.wydG=b.dataset.wg;render()});
+  const rB=r=>3+Math.min(r.f7,12)*0.8;
+  const GC={g1:'#2F6B3A',g2:'#B08A12'};
+  const sets=[];
+  ['g1','g2'].forEach(g=>[false,true].forEach(p=>{const l=showA.filter(r=>r.g===g&&r.p===p);if(!l.length)return;
+    sets.push({label:`${GR[g].n} – ${p?'pierwiastki':'wieloródki'}`,data:l.map(r=>({x:r.dim,y:r.m7,r:rB(r),w:r})),pointStyle:p?'triangle':'circle',backgroundColor:GC[g]+'88',borderColor:GC[g],borderWidth:1})}));
+  const cv=(a,lab,dash)=>({type:'line',label:lab,data:a.map((x,i)=>x?{x:i*7+3.5,y:x.v}:null).filter(Boolean),borderColor:'#5E6B60',borderWidth:2,borderDash:dash,pointRadius:0,tension:0.3,fill:false});
+  sets.push(cv(C.w,'Krzywa stada – wieloródki',[]),cv(C.p,'Krzywa stada – pierwiastki',[6,4]));
+  const tip=x=>{const r=x.raw.w;return r?`Krowa ${r.nr??'?'} (${GR[r.g].s}): ${fNum(r.m7)} kg, ${r.dim}. dzień, stacja ${fNum(r.f7)} kg`:`${x.dataset.label}: ${fNum(x.raw.y)} kg`};
+  const click=(e,els,ch)=>{const h=els.find(x=>ch.data.datasets[x.datasetIndex].data[x.index].w);if(h)cowSheet(ch.data.datasets[h.datasetIndex].data[h.index].w.k)};
+  const maxD=Math.ceil(Math.max(310,...showA.map(r=>r.dim+10))/50)*50;
+  S.charts.push(new Chart($('#wA'),{type:'bubble',data:{datasets:sets},options:{responsive:true,maintainAspectRatio:false,animation:false,onClick:click,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:tip}}},
+    scales:{x:{type:'linear',min:0,max:maxD,title:{display:true,text:'dzień laktacji'}},y:{min:0,title:{display:true,text:'kg mleka / dzień (śr. 7 dni)'}}}}}));
+  const mx=Math.ceil(Math.max(50,...g1.map(r=>r.m7+3))/5)*5;
+  S.charts.push(new Chart($('#wB'),{type:'scatter',data:{datasets:[
+    {label:'Grupa 1',data:g1.map(r=>({x:r.m7,y:r.f7,w:r})),pointBackgroundColor:g1.map(r=>WPH(r.dim)[0]),pointBorderColor:g1.map(r=>WPH(r.dim)[0]),pointStyle:g1.map(r=>r.p?'triangle':'circle'),pointRadius:6,pointHoverRadius:8},
+    {type:'line',label:'Zasada przydziału',data:[{x:0,y:0},{x:s.tmrMleko,y:0},{x:mx,y:rule(mx)}],borderColor:'#C0392B',borderWidth:2,pointRadius:0,fill:false}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,onClick:click,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>{const r=x.raw.w;return r?`Krowa ${r.nr??'?'}: ${fNum(r.m7)} kg mleka, ${fNum(r.f7)} kg paszy (zasada ${fNum(rule(r.m7))}), ${r.dim}. dzień`:''}}}},
+      scales:{x:{type:'linear',min:Math.max(0,Math.floor(Math.min(15,...g1.map(r=>r.m7-3))/5)*5),max:mx,title:{display:true,text:'mleko kg/dzień (śr. 7 dni)'}},y:{min:0,title:{display:true,text:'pasza ze stacji kg/dzień (śr. 7 dni)'}}}}}));
 }
 function zKrzywe(el){
   const C=ixCurves(),D=IX.d,R=D.ref;
