@@ -158,6 +158,9 @@ tbody tr:hover{background:#F7FAF6;cursor:pointer}
 .kpi b{display:block;font-size:22px}
 .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
 .chart-box{position:relative;height:320px}
+.wctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end;margin:10px 0}.wctl label{display:flex;flex-direction:column;font-size:13px;color:var(--c-mut,#5E6B60);gap:3px}.wctl input{width:110px}
+.wzt{min-width:0!important}.wzt td,.wzt th{white-space:normal}@media(max-width:600px){.wzt td,.wzt th{padding:6px 5px;font-size:13px}}
+.wzd input{padding:4px 6px;font-size:13px}.wzd .w60{width:60px}.wzd .w70{width:70px}.wzd .w80{width:80px}.wzd .wn{width:100px;display:block;margin-bottom:3px}.wzd select{font-size:12px;width:100px}.wzd td,.wzd th{padding:4px 6px;vertical-align:middle}.nowrap{white-space:nowrap}
 .fnotes{margin:6px 0 0;padding-left:18px;line-height:1.55}.fnotes li{margin:4px 0}.fnotes li.bad{color:var(--c-red)}.fnotes li.warn{color:#8a6100}.siara{color:#8E44AD}
 .wlg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:#5E6B60;margin:6px 0 8px}.wlg>span{display:flex;align-items:center;gap:6px}
 .wl-d{display:inline-block;width:11px;height:11px;border-radius:50%}.wl-l{display:inline-block;width:20px;border-top:2px solid #5E6B60}.wl-l.dash{border-top-style:dashed}.wl-l.red{border-top-color:#C0392B}
@@ -270,6 +273,7 @@ details summary{cursor:pointer}
   <button data-t="grupy">Grupy</button>
   <button data-t="stado">Stado</button>
   <button data-t="zyw">Żywienie</button>
+  <button data-t="woz">Wóz</button>
   <button data-t="pd">Próbne<span class="lbl-d"> doje</span></button>
   <button data-t="ust"><span class="lbl-d">Ustawienia</span><span class="lbl-m">Ustaw.</span></button>
 </nav>
@@ -290,7 +294,7 @@ const firebaseConfig={
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.7.0';
+const APP_VER='0.8.0';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
@@ -402,7 +406,7 @@ const LocalStore={
   _w(d){try{localStorage.setItem(this.key,JSON.stringify(d))}catch(e){toast('Nie udało się zapisać w pamięci przeglądarki: '+e.message,5000)}},
   async listFarms(){const d=this._d();return Object.entries(d.farms).map(([id,f])=>({id,name:f.name}))},
   async createFarm(id,name){const d=this._d();d.farms[id]={name,settings:{...DEF_SETTINGS},cows:{},moves:[],tests:{}};this._w(d)},
-  async loadFarm(id){const f=this._d().farms[id];return f?{name:f.name,settings:{...DEF_SETTINGS,...f.settings},cows:f.cows||{},moves:f.moves||[],tests:f.tests||{},zmianyDawki:f.zmianyDawki||[]}:null},
+  async loadFarm(id){const f=this._d().farms[id];return f?{name:f.name,settings:{...DEF_SETTINGS,...f.settings},cows:f.cows||{},moves:f.moves||[],tests:f.tests||{},zmianyDawki:f.zmianyDawki||[],woz:f.woz||null}:null},
   async commit(id,{cows=[],patches=[],moves=[],test=null,meta=null,delTest=null}){
     const d=this._d();const f=d.farms[id];if(!f)throw new Error('Brak gospodarstwa');
     cows.forEach(c=>f.cows[c.kolczyk]=clean(c));
@@ -424,7 +428,7 @@ const FireStore={
     if(!f.exists)return null;
     const cows={};cs.forEach(d=>cows[d.id]=d.data());
     const tests={};ts.forEach(d=>tests[d.id]=d.data());
-    return{name:f.data().name,settings:{...DEF_SETTINGS,...(f.data().settings||{})},cows,moves:ms.docs.map(d=>d.data()),tests,zmianyDawki:f.data().zmianyDawki||[]};
+    return{name:f.data().name,settings:{...DEF_SETTINGS,...(f.data().settings||{})},cows,moves:ms.docs.map(d=>d.data()),tests,zmianyDawki:f.data().zmianyDawki||[],woz:f.data().woz||null};
   },
   async commit(id,{cows=[],patches=[],moves=[],test=null,meta=null,delTest=null}){
     const fr=db.collection('farms').doc(id);
@@ -565,7 +569,7 @@ function render(){
   S.charts.forEach(c=>c.destroy());S.charts=[];
   if(!S.farm)return;
   LACC.clear();if(ixHas())ixL();
-  ({dzis:renderDzis,grupy:renderGrupy,stado:renderStado,zyw:renderZyw,pd:renderPD,ust:renderUst})[S.tab]();
+  ({dzis:renderDzis,grupy:renderGrupy,stado:renderStado,zyw:renderZyw,woz:renderWoz,pd:renderPD,ust:renderUst})[S.tab]();
   renderSelBar();
 }
 function openModal(html,o={}){
@@ -921,6 +925,157 @@ function renderStado(){
   };
 }
 
+/* ================== ZAKŁADKA: WÓZ PASZOWY ================== */
+const WOZ_DEF=()=>({
+  feeds:[
+    {id:'f1',n:'Kukurydza 2026',sm:34,cena:0},{id:'f2',n:'Trawa pryzma Gorzowska',sm:32,cena:0},{id:'f3',n:'Kisz. ziarno kukurydzy – drobny',sm:62,cena:400},
+    {id:'f4',n:'Śruta rzepakowa',sm:88,cena:1200},{id:'f5',n:'Lactorobo 19',sm:87,cena:0},{id:'f6',n:'Dobromilk GT 20 Granulat',sm:87,cena:1300},
+    {id:'f7',n:'BuforMAX',sm:98,cena:4000},{id:'f8',n:'Witaminer Premium',sm:95,cena:5000},{id:'f9',n:'Kiszonka z kukurydzy Formela',sm:33,cena:200},
+    {id:'f10',n:'Sianokiszonka Formela',sm:29,cena:200},{id:'f11',n:'Słoma pszenna',sm:84,cena:0}],
+  wagons:[
+    {id:'w1',n:'Grupa 1',g:'g1',r:{f1:22,f2:18,f3:4,f4:3,f6:2,f7:0.2,f8:0.2},zap:3,nOv:null,tmr:null},
+    {id:'w2',n:'Grupa 2',g:'g2',r:{f1:30,f2:20,f4:3,f6:2,f8:0.1},zap:3,nOv:null,tmr:null}],
+  stFeed:'f5',lacKg:null,hist:[]
+});
+function wozData(){const w=S.farm.woz||WOZ_DEF();if(!w.hist)w.hist=[];return w}
+const wozLacKg=W=>W.lacKg||(S.farm.settings.kgPaszyNaKgMleka>0?1/S.farm.settings.kgPaszyNaKgMleka:2.5);
+const wozTmr=w=>w.tmr!=null?w.tmr:(w.g==='g1'?S.farm.settings.tmrMleko:null);
+async function wozSave(W,msg){const ok=await commit({meta:{woz:W}});if(ok){S.farm.woz=W;if(msg)toast(msg)}return ok}
+function wozCows(w){return w.g?activeCows().filter(c=>gOf(c)===w.g):[]}
+function wozN(w){return w.nOv!=null&&w.nOv!==''?+w.nOv:wozCows(w).length}
+/* mleko i pasza ze stacji (średnie 7 dni z Infodexu) dla krów wozu */
+function wozCowStats(w){
+  if(!ixHas())return[];
+  const D=IX.d,R=D.ref,d7=dRange(addDays(R,-6),R);
+  return wozCows(w).map(c=>{const L=lac(c),id=L.id;if(!id)return null;const ser=D.ser[id]||{};
+    const m7=ixMilk7(id),pres=d7.filter(d=>ser[d]&&(ser[d].m>0||ser[d].f>0));
+    const f7=pres.length?avg(pres.map(d=>(ser[d].f||0)/1000)):null;
+    return{c,id,nr:c.nr,dim:L.dim,lt:lacType(c),m7,f7}}).filter(Boolean);
+}
+function wozCalc(W,w){
+  const n=wozN(w),k=n*(1+(+w.zap||0)/100);let cum=0,kgS=0,smS=0,cost=0;
+  const rows=W.feeds.filter(f=>(w.r[f.id]||0)>0).map(f=>{const kg=+w.r[f.id],load=kg*k;cum+=load;kgS+=kg;smS+=kg*(f.sm||0)/100;cost+=kg*(f.cena||0)/1000;return{f,kg,load,cum}});
+  return{n,rows,kgS,smS,cost,tot:cum};
+}
+const fK=(v,d)=>fNum(v,d??(Math.abs(v)<20?1:0));
+function renderWoz(){
+  if(!S.wzSec)S.wzSec='zal';
+  const sec=[['zal','Załadunek'],['bil','Bilans stół + stacja'],['daw','Dawki i ceny'],['his','Historia dawek']];
+  $('#main').innerHTML=`<div class="seg no-print">${sec.map(([k,n])=>`<button data-wz="${k}" class="${S.wzSec===k?'on':''}">${n}</button>`).join('')}</div><div id="wzBody"></div>`;
+  document.querySelectorAll('[data-wz]').forEach(b=>b.onclick=()=>{S.wzSec=b.dataset.wz;render()});
+  ({zal:wozZal,bil:wozBil,daw:wozDaw,his:wozHis})[S.wzSec]($('#wzBody'));
+}
+function wozZal(el){
+  const W=wozData(),st=W.feeds.find(f=>f.id===W.stFeed);
+  const card=w=>{
+    const C=wozCalc(W,w),cs=wozCowStats(w),m=avg(cs.map(x=>x.m7)),fst=avg(cs.map(x=>x.f7||0));
+    const stCost=st&&st.cena>0&&fst>0?fst*st.cena/1000:null;
+    const auto=wozCows(w).length;
+    return`<div class="card woz" data-w="${w.id}"><div class="row"><h2 style="margin:0">Wóz – ${esc(w.n)}</h2>${w.g?chip(w.g):''}<span class="spacer"></span><span class="muted">dawka z ${fDate(wozLastDate(W,w.id))||'–'}</span></div>
+      <div class="wctl">
+        <label>Krów${w.g?` <small class="muted">(w grupie: ${auto})</small>`:''}<input type="number" min="0" step="1" data-wf="nOv" value="${w.nOv??''}" placeholder="${auto}"></label>
+        <label>Zapas na niedojady %<input type="number" min="0" step="1" data-wf="zap" value="${w.zap??0}"></label>
+        <span class="muted">Zadawanie 1× dziennie</span>
+      </div>
+      ${C.rows.length?`<div class="tbl-wrap"><table class="wzt"><thead><tr><th>Składnik (kolejność załadunku)</th><th class="n">kg/szt.</th><th class="n">kg na wóz</th><th class="n">kg w wozie</th></tr></thead><tbody>
+      ${C.rows.map(r=>`<tr><td>${esc(r.f.n)}</td><td class="n">${fNum(r.kg,r.kg<1?2:1)}</td><td class="n"><b>${fK(r.load)}</b></td><td class="n">${fNum(r.cum,0)}</td></tr>`).join('')}
+      <tr class="tot"><td>Razem (${C.n} krów + ${w.zap||0}%)</td><td class="n">${fNum(C.kgS,1)}</td><td class="n">${fNum(C.tot,0)}</td><td></td></tr></tbody></table></div>`:'<p class="muted">Dawka pusta. Uzupełnij ją w „Dawki i ceny”.</p>'}
+      <div class="kpis" style="margin-top:10px">
+        <div class="kpi"><span class="muted">Sucha masa</span><b>${fNum(C.smS,1)} kg</b><span class="muted">na krowę z wozu</span></div>
+        <div class="kpi"><span class="muted">Koszt pasz z wozu</span><b>${fNum(C.cost,2)} zł</b><span class="muted">na krowę dziennie${W.feeds.some(f=>(w.r[f.id]||0)>0&&!f.cena)?' (część pasz bez ceny)':''}</span></div>
+        ${fst>0.05?`<div class="kpi"><span class="muted">Stacja (${esc(st?st.n:'pasza')})</span><b>${fNum(fst,1)} kg</b><span class="muted">${stCost!=null?`${fNum(stCost,2)} zł na krowę, ${fNum(stCost*cs.filter(x=>x.f7>0).length,0)} zł grupa dziennie`:'wpisz cenę paszy ze stacji'}</span></div>`:''}
+        ${m!=null?`<div class="kpi"><span class="muted">Mleko (Infodex, 7 dni)</span><b>${fNum(m,1)} kg</b><span class="muted">${C.cost+(stCost||0)>0?`${fNum((C.cost+(stCost||0))/m,2)} zł paszy na kg mleka`:''}</span></div>`:''}
+      </div></div>`};
+  el.innerHTML=`<div class="row no-print" style="margin-bottom:10px"><span class="muted">Liczba krów z zakładki Grupy. Wpisz inną, jeśli realnie jest ich więcej lub mniej (puste = z grupy).</span><span class="spacer"></span><button class="btn" id="wzPrint">Drukuj / PDF</button></div>
+    ${W.wagons.map(card).join('')}
+    <p class="muted">Ceny i dawki zmienisz w „Dawki i ceny”. Koszt liczony z cen wpisanych w aplikacji (zł za tonę świeżej masy).</p>`;
+  el.querySelectorAll('[data-wf]').forEach(i=>i.onchange=async()=>{const W2=JSON.parse(JSON.stringify(wozData())),w=W2.wagons.find(x=>x.id===i.closest('[data-w]').dataset.w);
+    const v=i.value.trim();w[i.dataset.wf]=v===''?(i.dataset.wf==='zap'?0:null):+v;if(await wozSave(W2))render()});
+  $('#wzPrint').onclick=()=>wozPrint(W);
+}
+function wozLastDate(W,wid){const h=W.hist.filter(x=>x.w===wid).map(x=>x.d).sort();return h.length?h[h.length-1]:null}
+function wozPrint(W){
+  const w0=window.open('','_blank');if(!w0)return toast('Przeglądarka zablokowała nowe okno');
+  const sec=W.wagons.map(w=>{const C=wozCalc(W,w);if(!C.rows.length)return'';
+    return`<h2>${esc(w.n)} — ${C.n} krów${w.zap?` + ${w.zap}% zapasu`:''}</h2><table><tr><th>Składnik</th><th>kg/szt.</th><th>kg na wóz</th><th>kg w wozie</th></tr>
+    ${C.rows.map(r=>`<tr><td>${esc(r.f.n)}</td><td>${fNum(r.kg,r.kg<1?2:1)}</td><td><b>${fK(r.load)}</b></td><td>${fNum(r.cum,0)}</td></tr>`).join('')}
+    <tr class="t"><td>RAZEM</td><td>${fNum(C.kgS,1)}</td><td>${fNum(C.tot,0)}</td><td></td></tr></table>`}).join('');
+  w0.document.write(`<html><head><meta charset="utf-8"><title>Wóz paszowy – ${esc(S.farm.name)}</title><style>body{font-family:Segoe UI,Arial;font-size:15px;margin:18px}table{border-collapse:collapse;width:100%;margin-bottom:18px}td,th{border:1px solid #999;padding:6px 8px;text-align:right}td:first-child,th:first-child{text-align:left}th{background:#eee}tr.t td{font-weight:700;background:#f3f3f3}h1{font-size:19px}h2{font-size:16px;margin:14px 0 6px}</style></head><body><h1>${esc(S.farm.name)} — wóz paszowy, ${fDate(todayISO())}</h1><p>Zadawanie 1× dziennie.</p>${sec}<script>window.print()<\/script></body></html>`);
+  w0.document.close();
+}
+function wozBil(el){
+  if(!ixHas()){el.innerHTML=ixNoData();bindIxFile();return}
+  const W=wozData(),lk=wozLacKg(W),st=W.feeds.find(f=>f.id===W.stFeed);
+  const out=W.wagons.filter(w=>w.g&&w.g!=='zas').map(w=>{
+    const tmr=wozTmr(w),cs=wozCowStats(w).filter(x=>x.m7!=null);
+    const rows=cs.map(x=>{const exp=tmr!=null?tmr+(x.f7||0)*lk:null;return{...x,exp,diff:exp!=null?x.m7-exp:null}}).sort((a,b)=>(a.diff??0)-(b.diff??0));
+    const A=k=>avg(rows.map(r=>r[k]));
+    return`<div class="card" data-w="${w.id}"><div class="row"><h2 style="margin:0">${esc(w.n)}: stół + stacja a mleko</h2>${chip(w.g)}</div>
+      <div class="wctl"><label>TMR wyliczony na (kg mleka)<input type="number" step="0.5" data-wt="tmr" value="${tmr??''}" placeholder="wpisz"></label></div>
+      ${tmr==null?'<p class="muted">Wpisz, na ile kg mleka jest wyliczony stół tej grupy (z FeedExpert).</p>':`
+      <div class="kpis"><div class="kpi"><span class="muted">Oczekiwane</span><b>${fNum(A('exp'),1)} kg</b><span class="muted">TMR ${fNum(tmr,1)} + stacja ${fNum(A('f7'),1)} kg × ${fNum(lk,2)}</span></div>
+        <div class="kpi"><span class="muted">Faktycznie (Infodex, 7 dni)</span><b>${fNum(A('m7'),1)} kg</b><span class="muted">${rows.length} krów</span></div>
+        <div class="kpi"><span class="muted">Różnica</span><b class="${A('diff')<-2?'bad':A('diff')>2?'pos':''}">${(A('diff')>=0?'+':'')+fNum(A('diff'),1)} kg</b><span class="muted">średnio na krowę</span></div></div>
+      <details style="margin-top:10px"><summary>Krowy (${rows.length}) – od największego niedoboru</summary><div class="tbl-wrap"><table><thead><tr><th>Krowa</th><th class="n">Dzień lakt.</th><th class="n">Stacja kg</th><th class="n">Oczekiwane kg</th><th class="n">Mleko kg</th><th class="n">Różnica</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr data-k="${esc(r.c.kolczyk)}" style="cursor:pointer"><td><span class="ltd ${r.lt?'lt-'+r.lt:''}"></span><b>${esc(r.nr??'?')}</b></td><td class="n">${r.dim??'–'}</td><td class="n">${fNum(r.f7,1)}</td><td class="n">${fNum(r.exp,1)}</td><td class="n">${fNum(r.m7,1)}</td><td class="n ${r.diff<-4?'bad':r.diff>4?'pos':''}">${(r.diff>=0?'+':'')+fNum(r.diff,1)}</td></tr>`).join('')}
+      </tbody></table></div></details>`}</div>`});
+  el.innerHTML=`<div class="card"><h2>Czy stół i stacja pokrywają mleko?</h2>
+    <p class="muted">Oczekiwane mleko = na ile kg mleka wyliczony jest TMR + pasza zjedzona ze stacji × <b>${fNum(lk,2)} kg mleka z 1 kg ${esc(st?st.n:'paszy ze stacji')}</b>. Porównuję z mlekiem z Infodexu (średnia z 7 dni).</p>
+    <div class="wctl"><label>kg mleka z 1 kg paszy ze stacji<input type="number" step="0.05" id="wzLk" value="${W.lacKg??''}" placeholder="${fNum(lk,2)}"></label></div>
+    <p class="muted" style="margin:6px 0 0"><b>Jak czytać:</b> wynik <span class="bad">na minusie</span> to krowa (albo grupa) dająca mniej mleka, niż wynika z dawki: za dużo paszy, problem zdrowotny albo dawka nie jest wyjadana. Wynik <span class="pos">na plus</span> to krowa dająca więcej, niż dostaje: zwykle świeża krowa mobilizująca rezerwy ciała albo za mało paszy ze stacji.</p></div>
+    ${out.join('')}`;
+  el.querySelectorAll('[data-wt]').forEach(i=>i.onchange=async()=>{const W2=JSON.parse(JSON.stringify(wozData())),w=W2.wagons.find(x=>x.id===i.closest('[data-w]').dataset.w);w.tmr=i.value.trim()===''?null:+i.value;if(await wozSave(W2))render()});
+  $('#wzLk').onchange=async e=>{const W2=JSON.parse(JSON.stringify(wozData()));W2.lacKg=e.target.value.trim()===''?null:+e.target.value;if(await wozSave(W2))render()};
+  el.querySelectorAll('tr[data-k]').forEach(tr=>tr.onclick=()=>cowSheet(tr.dataset.k));
+}
+function wozDaw(el){
+  if(!S.wzEd)S.wzEd=JSON.parse(JSON.stringify(wozData()));
+  const E=S.wzEd,GO=[['g1','Grupa 1'],['g2','Grupa 2'],['zas','Zasuszone'],['','bez grupy']];
+  const sumW=w=>E.feeds.reduce((a,f)=>a+(+w.r[f.id]||0),0);
+  el.innerHTML=`<div class="card"><div class="row"><h2 style="margin:0">Dawki (kg świeżej masy na krowę) i ceny</h2><span class="spacer"></span><button class="btn" id="wzAddW">+ Dodaj wóz</button></div>
+    <p class="muted">Kolejność wierszy to kolejność załadunku (strzałki). Ceny w zł za tonę. Po zapisaniu zmiana dawki trafi do historii i do „Żywienie → Zmiany dawki”.</p>
+    <div class="tbl-wrap"><table class="wzd"><thead><tr><th></th><th>Składnik</th><th class="n">SM %</th><th class="n">Cena zł/t</th>
+      ${E.wagons.map(w=>`<th class="n"><input class="wn" data-wn="${w.id}" value="${esc(w.n)}"><select data-wg2="${w.id}">${GO.map(([k,n])=>`<option value="${k}"${(w.g||'')===k?' selected':''}>${n}</option>`).join('')}</select>${E.wagons.length>1?`<button class="btn sm danger" data-wdel="${w.id}" title="Usuń wóz">×</button>`:''}</th>`).join('')}<th></th></tr></thead><tbody>
+    ${E.feeds.map((f,i)=>`<tr data-f="${f.id}"><td class="nowrap"><button class="btn sm" data-up="${i}" ${i?'':'disabled'}>↑</button><button class="btn sm" data-dn="${i}" ${i<E.feeds.length-1?'':'disabled'}>↓</button></td>
+      <td><input data-ff="n" value="${esc(f.n)}" style="min-width:190px"></td><td class="n"><input type="number" step="1" data-ff="sm" value="${f.sm??''}" class="w60"></td><td class="n"><input type="number" step="10" data-ff="cena" value="${f.cena??''}" class="w80"></td>
+      ${E.wagons.map(w=>`<td class="n"><input type="number" step="0.1" min="0" data-fr="${w.id}" value="${w.r[f.id]??''}" class="w70"></td>`).join('')}
+      <td><button class="btn sm danger" data-fdel="${f.id}" title="Usuń składnik">×</button></td></tr>`).join('')}
+    <tr class="tot"><td></td><td>Razem kg/szt.</td><td></td><td></td>${E.wagons.map(w=>`<td class="n">${fNum(sumW(w),1)}</td>`).join('')}<td></td></tr></tbody></table></div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="wzAddF">+ Składnik</button>
+      <label class="f" style="margin-left:12px">Pasza w stacji<select id="wzSt">${E.feeds.map(f=>`<option value="${f.id}"${E.stFeed===f.id?' selected':''}>${esc(f.n)}</option>`).join('')}</select></label>
+      <span class="spacer"></span><button class="btn" id="wzCancel">Cofnij zmiany</button><button class="btn pri" id="wzSave">Zapisz</button></div></div>`;
+  const up=()=>wozDaw(el);
+  el.querySelectorAll('[data-ff]').forEach(i=>i.oninput=()=>{const f=E.feeds.find(x=>x.id===i.closest('tr').dataset.f);f[i.dataset.ff]=i.dataset.ff==='n'?i.value:(i.value===''?null:+i.value)});
+  el.querySelectorAll('[data-fr]').forEach(i=>i.onchange=()=>{const w=E.wagons.find(x=>x.id===i.dataset.fr),fid=i.closest('tr').dataset.f;if(i.value===''||+i.value===0)delete w.r[fid];else w.r[fid]=+i.value;up()});
+  el.querySelectorAll('[data-wn]').forEach(i=>i.oninput=()=>{E.wagons.find(x=>x.id===i.dataset.wn).n=i.value});
+  el.querySelectorAll('[data-wg2]').forEach(i=>i.onchange=()=>{E.wagons.find(x=>x.id===i.dataset.wg2).g=i.value||null});
+  el.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.up;[E.feeds[i-1],E.feeds[i]]=[E.feeds[i],E.feeds[i-1]];up()});
+  el.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dn;[E.feeds[i+1],E.feeds[i]]=[E.feeds[i],E.feeds[i+1]];up()});
+  el.querySelectorAll('[data-fdel]').forEach(b=>b.onclick=()=>{const id=b.dataset.fdel;if(!confirm('Usunąć składnik?'))return;E.feeds=E.feeds.filter(f=>f.id!==id);E.wagons.forEach(w=>delete w.r[id]);up()});
+  el.querySelectorAll('[data-wdel]').forEach(b=>b.onclick=()=>{if(!confirm('Usunąć ten wóz?'))return;E.wagons=E.wagons.filter(w=>w.id!==b.dataset.wdel);up()});
+  $('#wzAddF').onclick=()=>{E.feeds.push({id:'f'+Date.now().toString(36),n:'Nowy składnik',sm:null,cena:null});up()};
+  $('#wzAddW').onclick=()=>{E.wagons.push({id:'w'+Date.now().toString(36),n:'Zasuszone',g:'zas',r:{},zap:3,nOv:null,tmr:null});up()};
+  $('#wzSt').onchange=e=>{E.stFeed=e.target.value};
+  $('#wzCancel').onclick=()=>{S.wzEd=null;up()};
+  $('#wzSave').onclick=async()=>{
+    const old=wozData(),T=todayISO(),hist=[...(old.hist||[])],zm=[];
+    E.wagons.forEach(w=>{const o=old.wagons.find(x=>x.id===w.id),or=o?o.r:{};
+      const ch=[...new Set([...Object.keys(or),...Object.keys(w.r)])].filter(k=>(+or[k]||0)!==(+w.r[k]||0)).map(k=>{const f=E.feeds.find(x=>x.id===k)||old.feeds.find(x=>x.id===k);return`${f?f.n:k} ${fNum(+or[k]||0,1)}→${fNum(+w.r[k]||0,1)} kg`});
+      if(ch.length||!o){hist.push({d:T,w:w.id,n:w.n,r:{...w.r},ch:ch.join(', ')||'nowy wóz'});if(ch.length)zm.push(`${w.n}: ${ch.join(', ')}`)}});
+    const W2={...E,hist:hist.slice(-200)};
+    if(!(await wozSave(W2,'Zapisano dawki')))return;
+    if(zm.length&&confirm('Dodać tę zmianę do „Żywienie → Zmiany dawki”, żeby aplikacja policzyła jej efekt?\n\n'+zm.join('\n'))){
+      const L=(S.farm.zmianyDawki||[]).slice();L.push({id:Date.now().toString(36),date:T,opis:'Wóz: '+zm.join('; ')});await saveZmiany(L)}
+    S.wzEd=null;render();
+  };
+}
+function wozHis(el){
+  const W=wozData(),h=W.hist.slice().sort((a,b)=>b.d.localeCompare(a.d));
+  el.innerHTML=`<div class="card"><h2>Historia dawek</h2>${h.length?`<div class="tbl-wrap"><table><thead><tr><th>Data</th><th>Wóz</th><th>Zmiana</th><th class="n">kg/szt.</th></tr></thead><tbody>
+    ${h.map(x=>`<tr><td>${fDate(x.d)}</td><td>${esc(x.n||x.w)}</td><td>${esc(x.ch||'')}</td><td class="n">${fNum(Object.values(x.r||{}).reduce((a,v)=>a+(+v||0),0),1)}</td></tr>`).join('')}</tbody></table></div>`
+    :'<p class="muted">Brak zapisanych zmian. Pierwszy zapis w „Dawki i ceny” zacznie historię. Dawki startowe pochodzą ze zrzutu FeedExpert z 23.10.2026.</p>'}</div>`;
+}
+
 /* ================== ZAKŁADKA: PRÓBNE DOJE ================== */
 function renderPD(){
   const dates=Object.keys(S.farm.tests).sort().reverse();
@@ -1176,7 +1331,7 @@ async function ixLoad(){
   }catch(e){console.error(e);toast('Nie udało się pobrać danych z Infodexu: '+e.message,5000)}
   finally{IX.loading=false}
 }
-function ixRerender(){if(S.farm&&['dzis','zyw','grupy','stado'].includes(S.tab)&&!$('#modalRoot .modal'))render()}
+function ixRerender(){if(S.farm&&['dzis','zyw','grupy','stado','woz'].includes(S.tab)&&!$('#modalRoot .modal'))render()}
 const ixHas=()=>!!(IX.d&&IX.d.dates.length);
 
 function ixBuild(){
@@ -1557,6 +1712,7 @@ function renderDzis(){
   const wr=stWrong(),H=ixHeats();
   $('#main').innerHTML=`${freshBar()}
   ${heatCard(H)}
+  ${notEatCard()}
   ${wr.length?`<div class="card stwarn"><div class="row"><span class="stb bad">S!</span><div><b>Sprawdź przypisanie do grupy (${wr.length}):</b> pobierają paszę ze stacji, a w aplikacji nie są w Grupie 1.<div class="ids" style="margin-top:6px">${wr.map(c=>nrLink(lac(c).id)).join('')}</div></div><span class="spacer"></span><button class="btn sm" onclick="goTab('grupy')">Popraw w Grupach</button></div></div>`:''}
   <div class="tiles">
     <div class="tile"><span class="muted">Mleko stada ${fD2(R)}</span><b>${fNum(hd.tot,0)} kg</b><span class="sub">${arrow(dTot)} względem średniej z 7 dni (${fNum(t7,0)} kg)</span></div>
@@ -1690,6 +1846,8 @@ function ixFeedPlan(){
   Object.keys(t).forEach(k=>{P.rows[k]=csvT(t[k]).length});
   PT.forEach(p=>{(P.pts[p.FeedingId]=P.pts[p.FeedingId]||[]).push(p)});Object.values(P.pts).forEach(l=>l.sort((a,b)=>a.Day-b.Day));
   IN.forEach(x=>{(P.ins[x.PointId]=P.ins[x.PointId]||[]).push(x);if(x.YieldKey>0)P.mt=true});
+  // mleko w tabeli mlecznej: kg (gdyby Infodex trzymał je w dziesiątych/gramach – przeskaluj)
+  const yk=Math.max(0,...IN.map(x=>x.YieldKey||0));P.yks=yk>1500?1000:yk>150?10:1;if(P.yks>1)IN.forEach(x=>{if(x.YieldKey)x.YieldKey=x.YieldKey/P.yks});
   const pick=(o,k,r)=>{const cur=o[k];if(!cur||(cur.IsParlour&&!r.IsParlour))o[k]=r};
   FN.forEach(r=>{if(r.CowId!=null)pick(P.byCow,String(r.CowId),r);else if(r.GroupId!=null)pick(P.byGroup,String(r.GroupId),r)});
   IX.fp=P;
@@ -1710,8 +1868,9 @@ function ixLacOf(id){const k=IXL&&IXL.ix2app[id],c=k&&S.farm.cows[k];if(c)return
 /* typy węzłów (Infodex FeedingDayPoints.Type): 0 = przed laktacją (Day -1), 1 = wg dnia laktacji, 4 = przed zasuszeniem; tabela mleczna = instrukcje z YieldKey > 0 */
 function planNodes(P,id){
   const h=ixCows()[id]||{};
-  let plan=P.byCow[P.mode==='db'?String(h.dbid):id];
-  if(!plan&&h.grp!=null)plan=P.byGroup[String(h.grp)];
+  const own=P.byCow[P.mode==='db'?String(h.dbid):id],grp=h.grp!=null?P.byGroup[String(h.grp)]:null;
+  // typ żywienia 1 = grupowe: wzorzec grupy (krowa może mieć stary wzorzec indywidualny, nieużywany)
+  const plan=h.feedType===1?(grp||own):(own||grp);
   return plan?(P.pts[plan.Id]||[]):null;
 }
 function nodeVal(P,pt,milk){
@@ -1742,6 +1901,50 @@ function feedLine(id){
   if(F.ft===0)return`<div class="muted">Stacja w Infodexie: <b class="bad">brak żywienia</b> – stacja nic tej krowie nie wyda${st}</div>`;
   return`<div class="muted">Stacja w Infodexie: żywienie ${esc(F.ftTxt||'?')}${F.kg!=null?`, dziś <b>${fNum(F.kg,1)} kg</b>`:''}${F.desc?` (${esc(F.desc)})`:''}${F.pre!=null?` · przed laktacją ${fNum(F.pre,1)} kg`:''}${st}</div>`;
 }
+/* krowy z dawką w Infodexie, które wczoraj zjadły mniej niż połowę (alarm w Dziś; w Infodexie ten alarm jest wyłączony) */
+function ixNotEating(){
+  const P=ixFeedPlan();if(!P||!P.ok)return[];
+  const D=IX.d,R=D.ref,out=[];
+  // tylko Grupa 1 – pozostałe grupy nie mają dostępu do stacji
+  for(const c of activeCows()){if(gOf(c)!=='g1')continue;const L=lac(c),id=L.id;if(!id||L.zas)continue;
+    const h=ixCows()[id]||{};if(h.feedType===0)continue;
+    const ser=D.ser[id]||{},r0=ser[R]||{};if(!(r0.m>0))continue;
+    const dose=planKg(P,id,L,ixMilk7(id));if(!(dose>=0.5))continue;
+    const ok=d=>{const r=ser[d]||{};return !(r.m>0)||(r.f||0)/1000>=dose*0.5};
+    if(ok(R))continue;
+    let n=0;for(let i=0;i<30;i++){const d=addDays(R,-i);if(ok(d))break;n++}
+    const f=(r0.f||0)/1000;if(n<2&&f>=0.1)continue; // jednodniowy niedojad bywa wyrównywany następnego dnia (przenoszenie paszy)
+    out.push({c,id,dose,f,n,g:gOf(c)});
+  }
+  return out.sort((a,b)=>b.n-a.n||(a.c.nr??1e9)-(b.c.nr??1e9));
+}
+function notEatCard(){
+  const l=ixNotEating();if(!l.length)return'';
+  return`<div class="card stwarn"><h2 style="margin-top:0">Nie zjadają paszy ze stacji (${l.length})</h2>
+    <p class="muted">Grupa 1: wczoraj nic nie zjadły albo od co najmniej 2 dni zjadają mniej niż połowę dawki ustawionej w Infodexie, choć są dojone. Sprawdź zdrowie, responder i dostęp do stacji. (W Infodexie ten alarm jest wyłączony.)</p>
+    <div class="alist">${l.map(x=>`<div class="aitem s${x.n>=3?3:2}">${nrLink(x.id)}<div class="ar"><div class="rs">wczoraj ${fNum(x.f,1)} z ${fNum(x.dose,1)} kg · ${x.n>1?`<b>od ${x.n} dni</b>`:'pierwszy dzień'}</div></div><div>${x.g!=='brak'?chip(x.g):''}</div></div>`).join('')}</div></div>`;
+}
+/* dawka w Infodexie a zasada (TMR + kg paszy na kg mleka) – lista do przestawienia */
+function doseVsRule(){
+  const P=ixFeedPlan(),s=S.farm.settings;if(!P||!P.ok)return null;
+  const rule=m=>Math.max(0,(m-s.tmrMleko)*s.kgPaszyNaKgMleka);
+  return activeCows().filter(c=>gOf(c)==='g1').map(c=>{const L=lac(c),id=L.id;if(!id||L.zas)return null;const m7=ixMilk7(id);if(m7==null)return null;
+    const h=ixCows()[id]||{},dose=h.feedType===0?0:planKg(P,id,L,m7),r=rule(m7);
+    return{c,id,nr:c.nr,dim:L.dim,m7,dose,rule:r,diff:dose!=null?dose-r:null,fresh:L.dim!=null&&L.dim<21}}).filter(Boolean).sort((a,b)=>Math.abs(b.diff??0)-Math.abs(a.diff??0));
+}
+/* kontrola kalibracji: dostawy paszy (SiloHistory) a suma wydana przez stacje */
+function calibFromSilo(){
+  const t=IX.feed&&IX.feed.tables;if(!t||!IX.d)return null;
+  const D=IX.d,first=D.dates[0],last=D.ref;
+  const sil=csvT(t.SiloHistory).filter(r=>(r.TotalVolume||0)>0).map(r=>({d:String(r.Date||'').slice(0,10),v:r.TotalVolume})).filter(x=>x.d>=first&&x.d<=last).sort((a,b)=>a.d.localeCompare(b.d));
+  if(sil.length<3)return null;
+  const from=sil[0].d,to=sil[sil.length-1].d,days=dRange(from,addDays(to,-1));
+  const have=days.filter(d=>D.herdDay[d]).length;if(have<days.length*0.9)return null;
+  let disp=0;for(const id in D.ser){if(id==='0')continue;const ser=D.ser[id];for(const d of days){const r=ser[d];if(r&&r.f>0)disp+=r.f/1000}}
+  const del=sil.slice(0,-1).reduce((a,x)=>a+x.v,0);if(!(del>0&&disp>0))return null;
+  const fs=csvT(t.FeedingStations),g0=(fs[0]&&fs[0].Forage1MotorRotationDose)||100,ratio=disp/del;
+  return{from,to,n:sil.length-1,del,disp,ratio,g0,gpr:g0/ratio};
+}
 /* uwagi do ustawień stacji w Infodexie */
 function feedSetupNotes(){
   if(!IX.feed)return'';
@@ -1752,6 +1955,7 @@ function feedSetupNotes(){
   else if(cnt.CalibrationHistory>0){const c=csvT(t.CalibrationHistory).map(r=>String(r.Date||'')).sort().pop();if(c)out.push(['',`Ostatnia kalibracja stacji: ${fDate(c.slice(0,10))}.`])}
   const sil=csvT(t.SiloHistory).filter(r=>(r.TotalVolume||0)>0).map(r=>({d:String(r.Date||'').slice(0,10),v:r.TotalVolume})).sort((a,b)=>a.d.localeCompare(b.d));
   if(sil.length){const l=sil[sil.length-1],ago=dayDiff(l.d,todayISO());out.push([ago>45?'warn':'',`Ostatnia dostawa paszy wpisana w Infodexie: ${fDate(l.d)} (${fNum(l.v/1000,1)} t)${ago>45?` – ${ago} dni temu. Jeśli były późniejsze dostawy, warto je wpisywać (Ustawienia → Silosy): pozwolą sprawdzić kalibrację stacji.`:'.'}`])}
+  {const cc=calibFromSilo();if(cc)out.push([Math.abs(cc.ratio-1)>0.08?'warn':'',`<b>Dostawy a wydanie stacji:</b> od ${fDate(cc.from)} do ${fDate(cc.to)} dowieziono ${fNum(cc.del/1000,1)} t (${cc.n} dostaw), a stacje według Infodexu wydały ${fNum(cc.disp/1000,1)} t (${fNum(cc.ratio*100,0)}%). ${Math.abs(cc.ratio-1)>0.08?`Jeśli przy dostawach zbiornik był podobnie pełny, stacja wydaje realnie około <b>${fNum(cc.gpr,0)} g na obrót</b>, a nie ${cc.g0} g, i kilogramy ze stacji są ${cc.ratio>1?'zawyżone':'zaniżone'} o ${fNum(Math.abs(cc.ratio-1)*100,0)}%.`:'Zgodność dobra: kalibracja wygląda na prawidłową.'} Porównanie przybliżone: zależy od stanu zbiornika w dniu dostawy.`])}
   if(ixPar('ShowNotEatingCowsAlarms')==='False')out.push(['warn','W Infodexie <b>wyłączony jest alarm o krowach, które nie jedzą paszy</b>. Hodowca nie widzi go na ekranie głównym. Włączenie: Ustawienia → Powiadomienia.']);
   const herd=ixCows(),L=ixL();
   const g1no=activeCows().filter(c=>gOf(c)==='g1').map(c=>({c,id:L.app2ix[c.kolczyk]})).filter(x=>x.id&&(herd[x.id]||{}).feedType===0);
@@ -2084,12 +2288,18 @@ function zStacja(el){
     <div class="grid2">${num('tmrMleko','TMR pokrywa (kg mleka)',1)}${num('kgPaszyNaKgMleka','kg paszy na 1 kg mleka',0.05)}${num('cenaPaszy','Cena paszy (zł/kg)',0.05)}</div>
     <div class="row" style="margin-top:10px"><span class="spacer"></span><button class="btn" id="zsSave">Przelicz i zapisz</button></div>
     <div class="chart-box" style="margin-top:12px"><canvas id="sCh"></canvas></div>
+
     <p class="muted">Każdy punkt to krowa korzystająca ze stacji. Linia: Twoja reguła. Krowy do 21 dnia laktacji pomijam, bo są w trakcie rozdajania.</p>
     <div class="kpis" style="margin-top:12px">
       <div class="kpi"><span class="muted">Za dużo paszy</span><b>${over.length} krów</b><span class="muted">nadwyżka ~${fNum(overKg)} kg/dzień</span></div>
       <div class="kpi"><span class="muted">Możliwa oszczędność</span><b>${fNum(overKg*s.cenaPaszy*30,0)} zł</b><span class="muted">miesięcznie, przy ${fNum(s.cenaPaszy,2)} zł/kg</span></div>
       <div class="kpi"><span class="muted">Za mało paszy</span><b>${under.length} krów</b><span class="muted">wydajność wyższa, niż wynika z dawki ze stacji</span></div>
     </div></div>
+  ${(()=>{const L=doseVsRule();if(!L)return'';const big=L.filter(r=>r.diff!=null&&Math.abs(r.diff)>=1&&!r.fresh);
+      return`<div class="card"><div class="row"><h2 style="margin:0">Grupa 1: dawka w Infodexie a zasada (${big.length})</h2><span class="spacer"></span><button class="btn sm" id="dvrPrint">Drukuj</button></div>
+      <p class="muted">Dawka ustawiona w Infodexie na dziś (wzorzec krowy lub grupy, z tabelą mleczną) porównana z Twoją zasadą: TMR na ${s.tmrMleko} kg mleka, potem ${fNum(s.kgPaszyNaKgMleka,2)} kg paszy na kg mleka. Pokazuję różnice od 1 kg, bez krów do 21. dnia laktacji (rozdajanie).</p>
+      ${big.length?`<div class="tbl-wrap"><table id="dvrT"><thead><tr><th>Krowa</th><th class="n">Dzień lakt.</th><th class="n">Mleko 7 dni</th><th class="n">Dawka Infodex</th><th class="n">Wg zasady</th><th class="n">Różnica</th></tr></thead><tbody>
+      ${big.map(r=>`<tr data-ix="${esc(r.id)}"><td><b>${esc(r.nr??'?')}</b></td><td class="n">${r.dim??'–'}</td><td class="n">${fNum(r.m7,1)}</td><td class="n">${fNum(r.dose,1)}</td><td class="n">${fNum(r.rule,1)}</td><td class="n ${r.diff>0?'warn':'bad'}">${r.diff>0?'+':''}${fNum(r.diff,1)}</td></tr>`).join('')}</tbody></table></div>`:'<p>Dawki zgadzają się z zasadą (różnice poniżej 1 kg).</p>'}</div>`})()}
   <div class="card"><h2>Za dużo paszy wg reguły (${over.length})</h2>${over.length?tbl(over,'o'):'<p>Brak.</p>'}</div>
   <div class="card"><h2>Za mało paszy wg reguły (${under.length})</h2>${under.length?tbl(under,'u'):'<p>Brak.</p>'}</div>
   ${g1No.length?`<div class="card"><h2>W Grupie 1, a nie pobierają paszy ze stacji (${g1No.length})</h2><p class="muted">Grupa 1 ma dostęp do stacji. Te krowy przez 7 dni nic nie pobrały: sprawdź responder, dawkę w Infodexie albo przydział do grupy.</p><div class="ids">${g1No.map(x=>nrLink(x.id)).join('')}</div></div>`:''}`;
@@ -2101,6 +2311,7 @@ function zStacja(el){
     options:{responsive:true,maintainAspectRatio:false,animation:false,onClick:(e,els)=>{const el=els.find(x=>x.datasetIndex===0);if(el)openIxCow(st.filter(adult)[el.index].id)},
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.id?`Krowa ${ixNr(c.raw.id)}: ${fNum(c.raw.x)} kg mleka, ${fNum(c.raw.y)} kg paszy`:''}}},
       scales:{x:{min:0,title:{display:true,text:'mleko kg/dzień (śr. 7 dni)'}},y:{min:0,title:{display:true,text:'pasza ze stacji kg/dzień'}}}}}));
+  {const b=$('#dvrPrint');if(b)b.onclick=()=>{const t=$('#dvrT');const w=window.open('','_blank');if(!w)return;w.document.write(`<html><head><meta charset="utf-8"><title>Dawki stacji</title><style>body{font-family:Segoe UI,Arial;font-size:14px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:5px 8px;text-align:right}td:first-child,th:first-child{text-align:left}</style></head><body><h2>${esc(S.farm.name)} – dawki stacji do sprawdzenia, ${fDate(todayISO())}</h2>${t?t.outerHTML:'Brak różnic.'}<script>window.print()<\/script></body></html>`);w.document.close()}}
   $('#zsSave').onclick=async()=>{const ns={...s};document.querySelectorAll('[data-zs2]').forEach(i=>{const v=parseFloat(i.value);if(!isNaN(v))ns[i.dataset.zs2]=v});
     if(await commit({meta:{settings:ns}})){S.farm.settings=ns;toast('Zapisano');render()}};
 }
