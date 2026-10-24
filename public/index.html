@@ -159,7 +159,12 @@ tbody tr:hover{background:#F7FAF6;cursor:pointer}
 .charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
 .chart-box{position:relative;height:320px}
 .wctl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end;margin:10px 0}.wctl label{display:flex;flex-direction:column;font-size:13px;color:var(--c-mut,#5E6B60);gap:3px}.wctl input{width:110px}
-.wzt{min-width:0!important}.wzt td,.wzt th{white-space:normal}@media(max-width:600px){.wzt td,.wzt th{padding:6px 5px;font-size:13px}}
+.wzt{min-width:0!important}.wzt td{vertical-align:middle}.wzt tr.wt-o td:nth-child(2){border-left:5px solid #3B8B4B}.wzt tr.wt-t td:nth-child(2){border-left:5px solid #C98A1B}.wzt tr.wt-m td:nth-child(2){border-left:5px solid #7E57C2}
+.wzt tr.wt-o{background:#F3F8F2}.wzt tr.wt-t{background:#FDF7EC}.wzt tr.wt-m{background:#F5F1FB}.wzt .wnum{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#2F6B3A;color:#fff;font-size:12px;font-weight:700;margin-right:8px}
+.wzt .wload b{font-size:17px;color:#1F4D2A}.wzt .wload small{display:block;color:#5E6B60;font-size:11.5px}.wzt .wcum{color:#5E6B60}.wzt .wload small.wdev{color:var(--c-red);font-weight:600}.wzt tr.tot .wload b{font-size:18px}
+.woz.woz-g1{border-top:5px solid var(--g1)}.woz.woz-g2{border-top:5px solid var(--g2)}.woz.woz-zas{border-top:5px solid var(--zas)}
+.wlgd{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin-top:8px}.wlgd>span[class^="wt-"]{padding-left:8px}.wlgd .wt-o{border-left:5px solid #3B8B4B}.wlgd .wt-t{border-left:5px solid #C98A1B}.wlgd .wt-m{border-left:5px solid #7E57C2}
+.wzd tr.wt-o td:first-child{border-left:4px solid #3B8B4B}.wzd tr.wt-t td:first-child{border-left:4px solid #C98A1B}.wzd tr.wt-m td:first-child{border-left:4px solid #7E57C2}.hlf{font-size:12px;white-space:nowrap}.wzd select[data-ft]{width:150px}.wzd select[data-ut]{width:110px}.wzt td,.wzt th{white-space:normal}@media(max-width:600px){.wzt td,.wzt th{padding:6px 5px;font-size:13px}}
 .wzd input{padding:4px 6px;font-size:13px}.wzd .w60{width:60px}.wzd .w70{width:70px}.wzd .w80{width:80px}.wzd .wn{width:100px;display:block;margin-bottom:3px}.wzd select{font-size:12px;width:100px}.wzd td,.wzd th{padding:4px 6px;vertical-align:middle}.nowrap{white-space:nowrap}
 .fnotes{margin:6px 0 0;padding-left:18px;line-height:1.55}.fnotes li{margin:4px 0}.fnotes li.bad{color:var(--c-red)}.fnotes li.warn{color:#8a6100}.siara{color:#8E44AD}
 .wlg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:#5E6B60;margin:6px 0 8px}.wlg>span{display:flex;align-items:center;gap:6px}
@@ -294,7 +299,7 @@ const firebaseConfig={
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.8.0';
+const APP_VER='0.8.2';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
@@ -929,8 +934,8 @@ function renderStado(){
 const WOZ_DEF=()=>({
   feeds:[
     {id:'f1',n:'Kukurydza 2026',sm:34,cena:0},{id:'f2',n:'Trawa pryzma Gorzowska',sm:32,cena:0},{id:'f3',n:'Kisz. ziarno kukurydzy – drobny',sm:62,cena:400},
-    {id:'f4',n:'Śruta rzepakowa',sm:88,cena:1200},{id:'f5',n:'Lactorobo 19',sm:87,cena:0},{id:'f6',n:'Dobromilk GT 20 Granulat',sm:87,cena:1300},
-    {id:'f7',n:'BuforMAX',sm:98,cena:4000},{id:'f8',n:'Witaminer Premium',sm:95,cena:5000},{id:'f9',n:'Kiszonka z kukurydzy Formela',sm:33,cena:200},
+    {id:'f4',n:'Śruta rzepakowa',sm:88,cena:1200},{id:'f5',n:'Lactorobo 19',sm:87,cena:0},{id:'f6',n:'Dobromilk GT 20 Granulat',sm:87,cena:1300,u:{t:'worek',kg:25,half:true}},
+    {id:'f7',n:'BuforMAX',sm:98,cena:4000,u:{t:'worek',kg:25,half:true}},{id:'f8',n:'Witaminer Premium',sm:95,cena:5000,u:{t:'worek',kg:25,half:true}},{id:'f9',n:'Kiszonka z kukurydzy Formela',sm:33,cena:200},
     {id:'f10',n:'Sianokiszonka Formela',sm:29,cena:200},{id:'f11',n:'Słoma pszenna',sm:84,cena:0}],
   wagons:[
     {id:'w1',n:'Grupa 1',g:'g1',r:{f1:22,f2:18,f3:4,f4:3,f6:2,f7:0.2,f8:0.2},zap:3,nOv:null,tmr:null},
@@ -952,9 +957,26 @@ function wozCowStats(w){
     const f7=pres.length?avg(pres.map(d=>(ser[d].f||0)/1000)):null;
     return{c,id,nr:c.nr,dim:L.dim,lt:lacType(c),m7,f7}}).filter(Boolean);
 }
+/* rodzaj paszy (kolor wiersza): o = objętościowa, t = treściwa, m = mineralna/dodatek */
+function wozTyp(f){if(f.typ)return f.typ;const n=(f.n||'').toLowerCase();if(/witamin|bufor|kred|sól|sol |mineral|premiks|premix|drożdż|soda|mocznik/.test(n))return'm';return(f.sm!=null&&f.sm<50)||/kiszon|sianokisz|trawa|słom|siano|lucern|wysłod|młóto/.test(n)?'o':'t'}
+const WTYP={o:'objętościowa',t:'treściwa',m:'mineralna / dodatek'};
+/* kolejność załadunku – osobna dla każdego wozu */
+function wozOrder(W,w){const ids=W.feeds.map(f=>f.id),o=(w.ord||[]).filter(id=>ids.includes(id));return[...o,...ids.filter(id=>!o.includes(id))]}
+/* jednostki: worek / wiadro / inne – ile sztuk wsypać (worki z połówkami) */
+function plN(n,f1,f2,f5,fr){if(fr)return fr;const a=Math.abs(n)%100,b=a%10;return n===1?f1:(b>=2&&b<=4&&!(a>=12&&a<=14))?f2:f5}
+const UNITS={worek:['worek','worki','worków','worka'],wiadro:['wiadro','wiadra','wiader','wiadra']};
+function wozUnits(f,kg){
+  const u=f.u;if(!u||!u.t||u.t==='kg'||!(u.kg>0))return null;
+  const step=u.half?u.kg/2:u.kg,n=Math.round(kg/step)*step/u.kg;if(n<=0)return null; // mniej niż najmniejsza porcja – odważyć w kg
+  const whole=Math.floor(n),half=n-whole>0.25;
+  const num=(whole?whole:'')+(half?'½':'');
+  const forms=UNITS[u.t];const word=forms?plN(whole,forms[0],forms[1],forms[2],half?forms[3]:null):esc(u.n||'szt.');
+  return{txt:`${num} ${word}`,kg:n*u.kg,size:u.kg};
+}
 function wozCalc(W,w){
   const n=wozN(w),k=n*(1+(+w.zap||0)/100);let cum=0,kgS=0,smS=0,cost=0;
-  const rows=W.feeds.filter(f=>(w.r[f.id]||0)>0).map(f=>{const kg=+w.r[f.id],load=kg*k;cum+=load;kgS+=kg;smS+=kg*(f.sm||0)/100;cost+=kg*(f.cena||0)/1000;return{f,kg,load,cum}});
+  const byId=Object.fromEntries(W.feeds.map(f=>[f.id,f]));
+  const rows=wozOrder(W,w).map(id=>byId[id]).filter(f=>(w.r[f.id]||0)>0).map(f=>{const kg=+w.r[f.id],load=kg*k,un=wozUnits(f,load),real=un?un.kg:load;cum+=real;kgS+=kg;smS+=kg*(f.sm||0)/100;cost+=kg*(f.cena||0)/1000;return{f,kg,load,un,real,cum,typ:wozTyp(f)}});
   return{n,rows,kgS,smS,cost,tot:cum};
 }
 const fK=(v,d)=>fNum(v,d??(Math.abs(v)<20?1:0));
@@ -971,15 +993,18 @@ function wozZal(el){
     const C=wozCalc(W,w),cs=wozCowStats(w),m=avg(cs.map(x=>x.m7)),fst=avg(cs.map(x=>x.f7||0));
     const stCost=st&&st.cena>0&&fst>0?fst*st.cena/1000:null;
     const auto=wozCows(w).length;
-    return`<div class="card woz" data-w="${w.id}"><div class="row"><h2 style="margin:0">Wóz – ${esc(w.n)}</h2>${w.g?chip(w.g):''}<span class="spacer"></span><span class="muted">dawka z ${fDate(wozLastDate(W,w.id))||'–'}</span></div>
+    return`<div class="card woz woz-${w.g||'x'}" data-w="${w.id}"><div class="row"><h2 style="margin:0">Wóz – ${esc(w.n)}</h2>${w.g?chip(w.g):''}<span class="spacer"></span><span class="muted">dawka z ${fDate(wozLastDate(W,w.id))||'–'}</span></div>
       <div class="wctl">
         <label>Krów${w.g?` <small class="muted">(w grupie: ${auto})</small>`:''}<input type="number" min="0" step="1" data-wf="nOv" value="${w.nOv??''}" placeholder="${auto}"></label>
         <label>Zapas na niedojady %<input type="number" min="0" step="1" data-wf="zap" value="${w.zap??0}"></label>
         <span class="muted">Zadawanie 1× dziennie</span>
       </div>
-      ${C.rows.length?`<div class="tbl-wrap"><table class="wzt"><thead><tr><th>Składnik (kolejność załadunku)</th><th class="n">kg/szt.</th><th class="n">kg na wóz</th><th class="n">kg w wozie</th></tr></thead><tbody>
-      ${C.rows.map(r=>`<tr><td>${esc(r.f.n)}</td><td class="n">${fNum(r.kg,r.kg<1?2:1)}</td><td class="n"><b>${fK(r.load)}</b></td><td class="n">${fNum(r.cum,0)}</td></tr>`).join('')}
-      <tr class="tot"><td>Razem (${C.n} krów + ${w.zap||0}%)</td><td class="n">${fNum(C.kgS,1)}</td><td class="n">${fNum(C.tot,0)}</td><td></td></tr></tbody></table></div>`:'<p class="muted">Dawka pusta. Uzupełnij ją w „Dawki i ceny”.</p>'}
+      ${C.rows.length?`<div class="tbl-wrap"><table class="wzt"><thead><tr><th class="no-print"></th><th>Składnik – kolejność załadunku</th><th class="n">kg/szt.</th><th class="n">Do wozu</th><th class="n">W wozie razem</th></tr></thead><tbody>
+      ${C.rows.map((r,i)=>`<tr class="wt-${r.typ}"><td class="no-print nowrap"><button class="btn sm" data-mv="${w.id}|${r.f.id}|-1" ${i?'':'disabled'} title="Wyżej">↑</button><button class="btn sm" data-mv="${w.id}|${r.f.id}|1" ${i<C.rows.length-1?'':'disabled'} title="Niżej">↓</button></td>
+        <td><span class="wnum">${i+1}</span><b>${esc(r.f.n)}</b></td><td class="n">${fNum(r.kg,r.kg<1?2:1)}</td>
+        <td class="n wload">${!r.un&&r.f.u&&r.f.u.t&&r.f.u.t!=='kg'?`<b>${fK(r.load)} kg</b><small>odważyć – mniej niż ${r.f.u.half?'pół '+(r.f.u.t==='wiadro'?'wiadra':r.f.u.t==='worek'?'worka':'porcji'):(r.f.u.t==='wiadro'?'jedno wiadro':r.f.u.t==='worek'?'jeden worek':'jedna porcja')}</small>`:r.un?`<b>${r.un.txt}</b><small>${fNum(r.real,1)} kg</small>`:`<b>${fK(r.load)} kg</b>`}</td><td class="n wcum">${fNum(r.cum,0)} kg</td></tr>`).join('')}
+      <tr class="tot"><td class="no-print"></td><td>Razem: ${C.n} krów + ${w.zap||0}% zapasu</td><td class="n">${fNum(C.kgS,1)}</td><td class="n wload"><b>${fNum(C.tot,0)} kg</b></td><td></td></tr></tbody></table></div>
+      <div class="wlgd"><span class="wt-o">objętościowe</span><span class="wt-t">treściwe</span><span class="wt-m">mineralne / dodatki</span><span class="muted">Strzałki zmieniają kolejność załadunku tego wozu. Jednostki (worek, wiadro) ustawisz w „Dawki i ceny”.</span></div>`:'<p class="muted">Dawka pusta. Uzupełnij ją w „Dawki i ceny”.</p>'}
       <div class="kpis" style="margin-top:10px">
         <div class="kpi"><span class="muted">Sucha masa</span><b>${fNum(C.smS,1)} kg</b><span class="muted">na krowę z wozu</span></div>
         <div class="kpi"><span class="muted">Koszt pasz z wozu</span><b>${fNum(C.cost,2)} zł</b><span class="muted">na krowę dziennie${W.feeds.some(f=>(w.r[f.id]||0)>0&&!f.cena)?' (część pasz bez ceny)':''}</span></div>
@@ -991,16 +1016,19 @@ function wozZal(el){
     <p class="muted">Ceny i dawki zmienisz w „Dawki i ceny”. Koszt liczony z cen wpisanych w aplikacji (zł za tonę świeżej masy).</p>`;
   el.querySelectorAll('[data-wf]').forEach(i=>i.onchange=async()=>{const W2=JSON.parse(JSON.stringify(wozData())),w=W2.wagons.find(x=>x.id===i.closest('[data-w]').dataset.w);
     const v=i.value.trim();w[i.dataset.wf]=v===''?(i.dataset.wf==='zap'?0:null):+v;if(await wozSave(W2))render()});
+  el.querySelectorAll('[data-mv]').forEach(b=>b.onclick=async()=>{const[wid,fid,dir]=b.dataset.mv.split('|');const W2=JSON.parse(JSON.stringify(wozData())),w=W2.wagons.find(x=>x.id===wid);
+    const used=wozOrder(W2,w).filter(id=>(w.r[id]||0)>0),rest=wozOrder(W2,w).filter(id=>!((w.r[id]||0)>0));const i=used.indexOf(fid),j=i+(+dir);if(i<0||j<0||j>=used.length)return;
+    [used[i],used[j]]=[used[j],used[i]];w.ord=[...used,...rest];if(await wozSave(W2))render()});
   $('#wzPrint').onclick=()=>wozPrint(W);
 }
 function wozLastDate(W,wid){const h=W.hist.filter(x=>x.w===wid).map(x=>x.d).sort();return h.length?h[h.length-1]:null}
 function wozPrint(W){
   const w0=window.open('','_blank');if(!w0)return toast('Przeglądarka zablokowała nowe okno');
   const sec=W.wagons.map(w=>{const C=wozCalc(W,w);if(!C.rows.length)return'';
-    return`<h2>${esc(w.n)} — ${C.n} krów${w.zap?` + ${w.zap}% zapasu`:''}</h2><table><tr><th>Składnik</th><th>kg/szt.</th><th>kg na wóz</th><th>kg w wozie</th></tr>
-    ${C.rows.map(r=>`<tr><td>${esc(r.f.n)}</td><td>${fNum(r.kg,r.kg<1?2:1)}</td><td><b>${fK(r.load)}</b></td><td>${fNum(r.cum,0)}</td></tr>`).join('')}
-    <tr class="t"><td>RAZEM</td><td>${fNum(C.kgS,1)}</td><td>${fNum(C.tot,0)}</td><td></td></tr></table>`}).join('');
-  w0.document.write(`<html><head><meta charset="utf-8"><title>Wóz paszowy – ${esc(S.farm.name)}</title><style>body{font-family:Segoe UI,Arial;font-size:15px;margin:18px}table{border-collapse:collapse;width:100%;margin-bottom:18px}td,th{border:1px solid #999;padding:6px 8px;text-align:right}td:first-child,th:first-child{text-align:left}th{background:#eee}tr.t td{font-weight:700;background:#f3f3f3}h1{font-size:19px}h2{font-size:16px;margin:14px 0 6px}</style></head><body><h1>${esc(S.farm.name)} — wóz paszowy, ${fDate(todayISO())}</h1><p>Zadawanie 1× dziennie.</p>${sec}<script>window.print()<\/script></body></html>`);
+    return`<h2>${esc(w.n)} — ${C.n} krów${w.zap?` + ${w.zap}% zapasu`:''}</h2><table><tr><th>#</th><th>Składnik</th><th>Do wozu</th><th>W wozie razem</th></tr>
+    ${C.rows.map((r,i)=>`<tr class="k${r.typ}"><td>${i+1}</td><td><b>${esc(r.f.n)}</b></td><td><b>${r.un?`${r.un.txt}</b> (${fNum(r.real,1)} kg)`:`${fK(r.load)} kg</b>`}</td><td>${fNum(r.cum,0)} kg</td></tr>`).join('')}
+    <tr class="t"><td></td><td>RAZEM</td><td>${fNum(C.tot,0)} kg</td><td></td></tr></table>`}).join('');
+  w0.document.write(`<html><head><meta charset="utf-8"><title>Wóz paszowy – ${esc(S.farm.name)}</title><style>body{font-family:Segoe UI,Arial;font-size:15px;margin:18px}table{border-collapse:collapse;width:100%;margin-bottom:18px}td,th{border:1px solid #999;padding:6px 8px;text-align:right}td:first-child,th:first-child{text-align:left}th{background:#eee}tr.t td{font-weight:700;background:#f3f3f3}tr.ko td:first-child{border-left:6px solid #3B8B4B}tr.kt td:first-child{border-left:6px solid #C98A1B}tr.km td:first-child{border-left:6px solid #7E57C2}h1{font-size:19px}h2{font-size:16px;margin:14px 0 6px}</style></head><body><h1>${esc(S.farm.name)} — wóz paszowy, ${fDate(todayISO())}</h1><p>Zadawanie 1× dziennie.</p>${sec}<script>window.print()<\/script></body></html>`);
   w0.document.close();
 }
 function wozBil(el){
@@ -1033,14 +1061,16 @@ function wozDaw(el){
   const E=S.wzEd,GO=[['g1','Grupa 1'],['g2','Grupa 2'],['zas','Zasuszone'],['','bez grupy']];
   const sumW=w=>E.feeds.reduce((a,f)=>a+(+w.r[f.id]||0),0);
   el.innerHTML=`<div class="card"><div class="row"><h2 style="margin:0">Dawki (kg świeżej masy na krowę) i ceny</h2><span class="spacer"></span><button class="btn" id="wzAddW">+ Dodaj wóz</button></div>
-    <p class="muted">Kolejność wierszy to kolejność załadunku (strzałki). Ceny w zł za tonę. Po zapisaniu zmiana dawki trafi do historii i do „Żywienie → Zmiany dawki”.</p>
-    <div class="tbl-wrap"><table class="wzd"><thead><tr><th></th><th>Składnik</th><th class="n">SM %</th><th class="n">Cena zł/t</th>
+    <p class="muted">Ceny w zł za tonę. Jednostka: jeśli paszę sypie się workami albo wiadrami, wybierz ją i wpisz wagę – w załadunku pokażę, ile worków/wiader wsypać (z połówkami, jeśli zaznaczysz). Kolejność załadunku zmienisz strzałkami w „Załadunku”. Po zapisaniu zmiana dawki trafi do historii i do „Żywienie → Zmiany dawki”.</p>
+    <div class="tbl-wrap"><table class="wzd"><thead><tr><th>Składnik</th><th>Rodzaj</th><th>Jednostka przy załadunku</th><th class="n">SM %</th><th class="n">Cena zł/t</th>
       ${E.wagons.map(w=>`<th class="n"><input class="wn" data-wn="${w.id}" value="${esc(w.n)}"><select data-wg2="${w.id}">${GO.map(([k,n])=>`<option value="${k}"${(w.g||'')===k?' selected':''}>${n}</option>`).join('')}</select>${E.wagons.length>1?`<button class="btn sm danger" data-wdel="${w.id}" title="Usuń wóz">×</button>`:''}</th>`).join('')}<th></th></tr></thead><tbody>
-    ${E.feeds.map((f,i)=>`<tr data-f="${f.id}"><td class="nowrap"><button class="btn sm" data-up="${i}" ${i?'':'disabled'}>↑</button><button class="btn sm" data-dn="${i}" ${i<E.feeds.length-1?'':'disabled'}>↓</button></td>
-      <td><input data-ff="n" value="${esc(f.n)}" style="min-width:190px"></td><td class="n"><input type="number" step="1" data-ff="sm" value="${f.sm??''}" class="w60"></td><td class="n"><input type="number" step="10" data-ff="cena" value="${f.cena??''}" class="w80"></td>
+    ${E.feeds.map((f,i)=>{const u=f.u||{};return`<tr data-f="${f.id}" class="wt-${wozTyp(f)}">
+      <td><input data-ff="n" value="${esc(f.n)}" style="min-width:190px"></td>
+      <td><select data-ft>${[['','auto'],['o','objętościowa'],['t','treściwa'],['m','mineralna']].map(([k,n])=>`<option value="${k}"${(f.typ||'')===k?' selected':''}>${n}${!k?' ('+WTYP[wozTyp({...f,typ:''})].split(' ')[0]+')':''}</option>`).join('')}</select></td>
+      <td class="nowrap"><select data-ut>${[['kg','kg (waga)'],['worek','worek'],['wiadro','wiadro'],['inne','inne']].map(([k,n])=>`<option value="${k}"${(u.t||'kg')===k?' selected':''}>${n}</option>`).join('')}</select>${u.t&&u.t!=='kg'?` ${u.t==='inne'?`<input data-un value="${esc(u.n||'')}" placeholder="nazwa" class="w70">`:''}<input type="number" step="0.5" min="0" data-uk value="${u.kg??''}" class="w60" placeholder="kg"> kg <label class="hlf"><input type="checkbox" data-uh ${u.half?'checked':''}> połówki</label>`:''}</td><td class="n"><input type="number" step="1" data-ff="sm" value="${f.sm??''}" class="w60"></td><td class="n"><input type="number" step="10" data-ff="cena" value="${f.cena??''}" class="w80"></td>
       ${E.wagons.map(w=>`<td class="n"><input type="number" step="0.1" min="0" data-fr="${w.id}" value="${w.r[f.id]??''}" class="w70"></td>`).join('')}
-      <td><button class="btn sm danger" data-fdel="${f.id}" title="Usuń składnik">×</button></td></tr>`).join('')}
-    <tr class="tot"><td></td><td>Razem kg/szt.</td><td></td><td></td>${E.wagons.map(w=>`<td class="n">${fNum(sumW(w),1)}</td>`).join('')}<td></td></tr></tbody></table></div>
+      <td><button class="btn sm danger" data-fdel="${f.id}" title="Usuń składnik">×</button></td></tr>`}).join('')}
+    <tr class="tot"><td>Razem kg/szt.</td><td></td><td></td><td></td><td></td>${E.wagons.map(w=>`<td class="n">${fNum(sumW(w),1)}</td>`).join('')}<td></td></tr></tbody></table></div>
     <div class="row" style="margin-top:10px"><button class="btn" id="wzAddF">+ Składnik</button>
       <label class="f" style="margin-left:12px">Pasza w stacji<select id="wzSt">${E.feeds.map(f=>`<option value="${f.id}"${E.stFeed===f.id?' selected':''}>${esc(f.n)}</option>`).join('')}</select></label>
       <span class="spacer"></span><button class="btn" id="wzCancel">Cofnij zmiany</button><button class="btn pri" id="wzSave">Zapisz</button></div></div>`;
@@ -1049,8 +1079,12 @@ function wozDaw(el){
   el.querySelectorAll('[data-fr]').forEach(i=>i.onchange=()=>{const w=E.wagons.find(x=>x.id===i.dataset.fr),fid=i.closest('tr').dataset.f;if(i.value===''||+i.value===0)delete w.r[fid];else w.r[fid]=+i.value;up()});
   el.querySelectorAll('[data-wn]').forEach(i=>i.oninput=()=>{E.wagons.find(x=>x.id===i.dataset.wn).n=i.value});
   el.querySelectorAll('[data-wg2]').forEach(i=>i.onchange=()=>{E.wagons.find(x=>x.id===i.dataset.wg2).g=i.value||null});
-  el.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.up;[E.feeds[i-1],E.feeds[i]]=[E.feeds[i],E.feeds[i-1]];up()});
-  el.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dn;[E.feeds[i+1],E.feeds[i]]=[E.feeds[i],E.feeds[i+1]];up()});
+  const fOf=i=>E.feeds.find(x=>x.id===i.closest('tr').dataset.f);
+  el.querySelectorAll('[data-ft]').forEach(i=>i.onchange=()=>{const f=fOf(i);if(i.value)f.typ=i.value;else delete f.typ;up()});
+  el.querySelectorAll('[data-ut]').forEach(i=>i.onchange=()=>{const f=fOf(i);if(i.value==='kg')delete f.u;else f.u={...(f.u||{}),t:i.value,kg:(f.u&&f.u.kg)||(i.value==='worek'?25:i.value==='wiadro'?8:null),half:f.u?f.u.half:i.value==='worek'};up()});
+  el.querySelectorAll('[data-uk]').forEach(i=>i.oninput=()=>{fOf(i).u.kg=i.value===''?null:+i.value});
+  el.querySelectorAll('[data-un]').forEach(i=>i.oninput=()=>{fOf(i).u.n=i.value});
+  el.querySelectorAll('[data-uh]').forEach(i=>i.onchange=()=>{fOf(i).u.half=i.checked});
   el.querySelectorAll('[data-fdel]').forEach(b=>b.onclick=()=>{const id=b.dataset.fdel;if(!confirm('Usunąć składnik?'))return;E.feeds=E.feeds.filter(f=>f.id!==id);E.wagons.forEach(w=>delete w.r[id]);up()});
   el.querySelectorAll('[data-wdel]').forEach(b=>b.onclick=()=>{if(!confirm('Usunąć ten wóz?'))return;E.wagons=E.wagons.filter(w=>w.id!==b.dataset.wdel);up()});
   $('#wzAddF').onclick=()=>{E.feeds.push({id:'f'+Date.now().toString(36),n:'Nowy składnik',sm:null,cena:null});up()};
