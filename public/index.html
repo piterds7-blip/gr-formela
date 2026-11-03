@@ -164,7 +164,8 @@ tbody tr:hover{background:#F7FAF6;cursor:pointer}
 .wzt .wload b{font-size:17px;color:#1F4D2A}.wzt .wload small{display:block;color:#5E6B60;font-size:11.5px}.wzt .wcum{color:#5E6B60}.wzt .wload small.wdev{color:var(--c-red);font-weight:600}.wzt tr.tot .wload b{font-size:18px}
 .woz.woz-g1{border-top:5px solid var(--g1)}.woz.woz-g2{border-top:5px solid var(--g2)}.woz.woz-zas{border-top:5px solid var(--zas)}
 .wlgd{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin-top:8px}.wlgd>span[class^="wt-"]{padding-left:8px}.wlgd .wt-o{border-left:5px solid #3B8B4B}.wlgd .wt-t{border-left:5px solid #C98A1B}.wlgd .wt-m{border-left:5px solid #7E57C2}
-.wzd tr.wt-o td:first-child{border-left:4px solid #3B8B4B}.wzd tr.wt-t td:first-child{border-left:4px solid #C98A1B}.wzd tr.wt-m td:first-child{border-left:4px solid #7E57C2}.hlf{font-size:12px;white-space:nowrap}.wzd select[data-ft]{width:150px}.wzd select[data-ut]{width:110px}.wzt td,.wzt th{white-space:normal}@media(max-width:600px){.wzt td,.wzt th{padding:6px 5px;font-size:13px}}
+.wzd tr.wt-o td:first-child{border-left:4px solid #3B8B4B}.wzd tr.wt-t td:first-child{border-left:4px solid #C98A1B}.wzd tr.wt-m td:first-child{border-left:4px solid #7E57C2}.hlf{font-size:12px;white-space:nowrap}
+.ftb{display:inline-block;margin-left:3px;vertical-align:3px;font-size:11px;font-weight:800;line-height:16px;min-width:16px;padding:0 3px;text-align:center;border-radius:4px;cursor:help}.ftb-i{background:#E3ECF7;color:#2F5F96;border:1px solid #9FB9DA}.ftb-g{background:#E8F0E9;color:#2F6B3A;border:1px solid #9CC3A3}.ftb-b{background:var(--c-red);color:#fff}.wzd select[data-ft]{width:150px}.wzd select[data-ut]{width:110px}.wzt td,.wzt th{white-space:normal}@media(max-width:600px){.wzt td,.wzt th{padding:6px 5px;font-size:13px}}
 .wzd input{padding:4px 6px;font-size:13px}.wzd .w60{width:60px}.wzd .w70{width:70px}.wzd .w80{width:80px}.wzd .wn{width:100px;display:block;margin-bottom:3px}.wzd select{font-size:12px;width:100px}.wzd td,.wzd th{padding:4px 6px;vertical-align:middle}.nowrap{white-space:nowrap}
 .fnotes{margin:6px 0 0;padding-left:18px;line-height:1.55}.fnotes li{margin:4px 0}.fnotes li.bad{color:var(--c-red)}.fnotes li.warn{color:#8a6100}.siara{color:#8E44AD}
 .wlg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:#5E6B60;margin:6px 0 8px}.wlg>span{display:flex;align-items:center;gap:6px}
@@ -279,7 +280,6 @@ details summary{cursor:pointer}
   <button data-t="stado">Stado</button>
   <button data-t="zyw">Żywienie</button>
   <button data-t="woz">Wóz</button>
-  <button data-t="pd">Próbne<span class="lbl-d"> doje</span></button>
   <button data-t="ust"><span class="lbl-d">Ustawienia</span><span class="lbl-m">Ustaw.</span></button>
 </nav>
 <main id="main"></main>
@@ -299,7 +299,7 @@ const firebaseConfig={
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.8.2';
+const APP_VER='0.9.0';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
@@ -574,7 +574,7 @@ function render(){
   S.charts.forEach(c=>c.destroy());S.charts=[];
   if(!S.farm)return;
   LACC.clear();if(ixHas())ixL();
-  ({dzis:renderDzis,grupy:renderGrupy,stado:renderStado,zyw:renderZyw,woz:renderWoz,pd:renderPD,ust:renderUst})[S.tab]();
+  ({dzis:renderDzis,grupy:renderGrupy,stado:renderStado,zyw:renderZyw,woz:renderWoz,pd:renderStado,ust:renderUst})[S.tab]();
   renderSelBar();
 }
 function openModal(html,o={}){
@@ -648,7 +648,7 @@ function renderGrupy(){
   const sugs=cows.map(c=>({c,s:suggestion(c)})).filter(x=>x.s).sort((a,b)=>(a.c.nr??1e9)-(b.c.nr??1e9));
   const cnt={brak:0,g1:0,g2:0,zas:0};cows.forEach(c=>cnt[gOf(c)]++);
   if(!cows.length){
-    $('#main').innerHTML=`<div class="card"><h2>Brak krów</h2><p>Lista krów powstaje z pliku próbnego doju. Wgraj plik z SOL w zakładce <b>Próbne doje</b>, a krowy pojawią się tutaj do przydzielenia.</p><button class="btn pri" onclick="goTab('pd')">Wgraj próbny dój</button></div>`;return;
+    $('#main').innerHTML=`<div class="card"><h2>Brak krów</h2><p>Lista krów powstaje z pliku próbnego doju. Wgraj plik z SOL w zakładce <b>Stado</b> (na górze), a krowy pojawią się tutaj do przydzielenia.</p><button class="btn pri" onclick="goTab('stado')">Wgraj próbny dój</button></div>`;return;
   }
   if(S.mobCol==='brak'&&!cnt.brak)S.mobCol='g1';
   if(!S.mobInit){S.mobInit=true;if(cnt.brak)S.mobCol='brak'}
@@ -893,7 +893,13 @@ function stadoAvgRows(rows){
       <td class="n ${A.lks>s.lksProg?'bad':''}">${fNum(A.lks,0)}${lks.length?`<div class="muted" style="font-weight:400;font-size:11px;white-space:nowrap">med. ${fNum(med(lks),0)} · ${nHi} szt. &gt;${s.lksProg}</div>`:''}</td><td></td></tr>`}).join('');
 }
 function renderStado(){
-  const s=S.farm.settings,rows=stadoRows();
+  const dates=Object.keys(S.farm.tests).sort().reverse();
+  if(!S.pdDate||!S.farm.tests[S.pdDate])S.pdDate=dates[0]||null;
+  $('#main').innerHTML=`${pdUploadCard()}<div class="card"><h2 style="margin-top:0">Stado</h2><div id="stadoBox"></div></div>${pdAnalysisCard(dates)}`;
+  renderStadoBox();bindPD(dates);
+}
+function renderStadoBox(){
+  const s=S.farm.settings,rows=stadoRows(),box=$('#stadoBox');
   const cell=(c,k)=>{const p=c.ostPd||{};switch(k){
     case'nr':{const lt=lacType(c);return`<td class="n"><span class="ltd ${lt?'lt-'+lt:''}" title="${lt?LTN[lt]:''}"></span><b>${esc(c.nr??'')}</b>${stBadge(c)}</td>`}
     case'nazwa':return`<td>${esc(c.nazwa||'')}${pinned(c)?' 📌':''}</td>`;
@@ -911,7 +917,7 @@ function renderStado(){
     case'info':return`<td>${esc(p.info||'')}</td>`;
   }};
   const fl=[['all','Wszystkie'],['g1','Grupa 1'],['g2','Grupa 2'],['zas','Zasuszone'],['brak','Nieprzypisane'],['gone','Usunięte']];
-  $('#main').innerHTML=`<div class="board-bar">
+  box.innerHTML=`<div class="board-bar">
     <input type="search" id="q" placeholder="Szukaj: nr, nazwa, kolczyk" value="${esc(S.q)}">
     <div class="row">${fl.map(([k,n])=>`<button class="btn sm${S.stadoG===k?' pri':''}" data-fg="${k}">${n}</button>`).join('')}</div>
     <span class="spacer"></span><span class="muted">${rows.length} krów</span><button class="btn" id="expBtn">Eksport do Excela</button></div>
@@ -919,10 +925,10 @@ function renderStado(){
   <tbody>${rows.map(c=>`<tr data-k="${esc(c.kolczyk)}">${STADO_COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="14" class="muted">Brak krów w tym widoku.</td></tr>`}
   ${stadoAvgRows(rows)}</tbody></table></div>
   ${lacLegend()}<p class="muted">Laktacja, wycielenie i dzień laktacji: ${ixHas()?'z Infodexu (bieżące)':'z próbnego doju'}. Wartości składu mleka pochodzą z ostatniego wgranego próbnego doju. Kolorem oznaczone wartości poza normami z Ustawień.</p>`;
-  const q=$('#q');q.oninput=()=>{S.q=q.value;const p=q.selectionStart;renderStado();const n=$('#q');n.focus();n.setSelectionRange(p,p)};
-  document.querySelectorAll('[data-fg]').forEach(b=>b.onclick=()=>{S.stadoG=b.dataset.fg;renderStado()});
-  document.querySelectorAll('[data-sk]').forEach(th=>th.onclick=()=>{const k=th.dataset.sk;S.stadoSort=S.stadoSort.k===k?{k,d:-S.stadoSort.d}:{k,d:1};renderStado()});
-  document.querySelectorAll('tbody tr[data-k]').forEach(tr=>tr.onclick=()=>cowSheet(tr.dataset.k));
+  const q=$('#q');q.oninput=()=>{S.q=q.value;const p=q.selectionStart;renderStadoBox();const n=$('#q');n.focus();n.setSelectionRange(p,p)};
+  box.querySelectorAll('[data-fg]').forEach(b=>b.onclick=()=>{S.stadoG=b.dataset.fg;renderStadoBox()});
+  box.querySelectorAll('[data-sk]').forEach(th=>th.onclick=()=>{const k=th.dataset.sk;S.stadoSort=S.stadoSort.k===k?{k,d:-S.stadoSort.d}:{k,d:1};renderStadoBox()});
+  box.querySelectorAll('tbody tr[data-k]').forEach(tr=>tr.onclick=()=>cowSheet(tr.dataset.k));
   $('#expBtn').onclick=()=>{
     const data=rows.map(c=>{const p=c.ostPd||{};return{'Nr':c.nr,'Nazwa':c.nazwa,'Kolczyk':c.kolczyk,'Grupa':GR[gOf(c)].n,'W grupie od':c.grupaOd?c.grupaOd.slice(0,10):'','Laktacja':lac(c).lakt,'Wycielenie':lac(c).dataWyc,'Typ':LTN[lacType(c)]||'','Stacja (ostatni dzień, kg)':lac(c).id?stInfo(lac(c).id).y:'','Dzień laktacji':dim(c),'Planowane wycielenie':c.plWyc||'','PD data':p.date||'','kg':p.kg,'Tł %':p.tl,'Bi %':p.bi,'T/B':p.tb,'Mocznik':p.moc,'LKS':p.lks,'Uwagi PD':p.info||'','Notatka':c.notatka||''}});
     const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Stado');
@@ -1111,20 +1117,17 @@ function wozHis(el){
 }
 
 /* ================== ZAKŁADKA: PRÓBNE DOJE ================== */
-function renderPD(){
-  const dates=Object.keys(S.farm.tests).sort().reverse();
-  if(!S.pdDate||!S.farm.tests[S.pdDate])S.pdDate=dates[0]||null;
-  $('#main').innerHTML=`
-  <div class="card no-print">
+function pdUploadCard(){return`<div class="card no-print">
     <div class="row"><div><h2>Wgraj próbny dój</h2><div class="muted">Plik Excel z SOL/PFHB („Ostatni próbny dój”). Krowy dopasowuję po numerze kolczyka.</div></div></div>
     <div class="drop-zone" id="dz" style="margin-top:12px"><p style="margin:0 0 10px">Przeciągnij plik tutaj albo</p>
     <label class="btn pri">Wybierz plik<input type="file" id="pdFile" accept=".xlsx,.xls,.csv" hidden></label></div>
     <div id="pdPreview"></div>
-  </div>
-  ${dates.length?`<div class="card"><div class="row"><h2 style="margin:0">Analiza</h2><select id="pdSel">${dates.map(d=>`<option value="${d}"${d===S.pdDate?' selected':''}>${fDate(d)}</option>`).join('')}</select>
+  </div>`}
+function pdAnalysisCard(dates){return dates.length?`<div class="card"><div class="row"><h2 style="margin:0">Próbny dój – analiza</h2><select id="pdSel">${dates.map(d=>`<option value="${d}"${d===S.pdDate?' selected':''}>${fDate(d)}</option>`).join('')}</select>
     <span class="spacer"></span><button class="btn sm danger" id="pdDel">Usuń ten próbny dój</button></div>
     <p class="muted">Grupy według Twojego bieżącego podziału w zakładce Grupy.</p><div id="pdAn"></div></div>`:
-    '<div class="card muted">Nie ma jeszcze żadnego próbnego doju. Wgraj pierwszy plik powyżej.</div>'}`;
+    '<div class="card muted">Nie ma jeszcze żadnego próbnego doju. Wgraj pierwszy plik powyżej.</div>'}
+function bindPD(dates){
   const dz=$('#dz'),fi=$('#pdFile');
   fi.onchange=()=>fi.files[0]&&readPDFile(fi.files[0]);
   dz.ondragover=e=>{e.preventDefault();dz.classList.add('over')};dz.ondragleave=()=>dz.classList.remove('over');
@@ -2005,6 +2008,7 @@ function feedSetupNotes(){
 }
 /* opis wzorca żywienia krowy w Infodexie (do karty krowy) */
 const FTN={0:'brak żywienia',1:'grupowe',2:'indywidualne'};
+const ftBadge=ft=>ft===2?'<span class="ftb ftb-i" title="Żywienie na stacji w Infodexie: indywidualne (własny wzorzec krowy)">I</span>':ft===1?'<span class="ftb ftb-g" title="Żywienie na stacji w Infodexie: grupowe (wzorzec grupy, tabela mleczna)">G</span>':ft===0?'<span class="ftb ftb-b" title="W Infodexie: brak żywienia – stacja nic tej krowie nie wyda">B</span>':'';
 function ixFeedInfo(id){
   const h=ixCows()[id]||{},P=ixFeedPlan(),L=ixLacOf(id);
   const o={ft:h.feedType,ftTxt:FTN[h.feedType]??null,kg:null,pre:null,desc:'',lc:h.lc};
@@ -2039,10 +2043,14 @@ function g1Rows(){
     const ftx=id?(ixCows()[id]||{}).feedType:null;
     if(P&&P.ok&&id){const v=ftx===0?0:planKg(P,id,L,m7);if(v!=null){lim=v;limSrc='plan'}}
     if(lim==null&&id){const mx=Math.max(0,...d7.map(d=>(rec(d).f||0)/1000));if(mx>0){lim=mx;limSrc='est'}}
+    // limit z tych samych 7 dni co pobranie (dzień laktacji i średnie mleko z każdego dnia), żeby przejście między węzłami nie zawyżało %
+    let lim7=lim;
+    if(limSrc==='plan'&&pres.length){const lv=pres.map(d=>{if(ftx===0)return 0;const dd=rec(d).dim??(L.dim!=null?L.dim-dayDiff(d,todayISO()):null);
+      const mm=dRange(addDays(d,-7),addDays(d,-1)).map(x=>rec(x).m).filter(x=>x>0);return planKg(P,id,{dim:dd,zas:false},mm.length?avg(mm):m7)}).filter(v=>v!=null);if(lv.length)lim7=avg(lv)}
     const pd=c.ostPd,pdOk=pd&&pd.kg&&pd.tl&&pd.bi&&(!L.dataWyc||pd.date>=L.dataWyc);
     const r7=d7.map(d=>perDay(rec(d),'rum','nr')).filter(v=>v!=null),rp=p7.map(d=>perDay(rec(d),'rum','nr')).filter(v=>v!=null);
     return{k,c,id,wrong,nr:c.nr,lt:lacType(c),dim:L.dim,lakt:L.lakt,lim,limSrc,ft:ftx,fy,f7,
-      use:lim>0&&f7!=null?f7/lim*100:null,my:rec(R).m||null,m7,trend:m7!=null&&mp!=null?m7-mp:null,
+      lim7,use:lim7>0&&f7!=null?f7/lim7*100:null,my:rec(R).m||null,m7,trend:m7!=null&&mp!=null?m7-mp:null,
       ecm:pdOk?pd.kg*(0.383*pd.tl+0.242*pd.bi+0.7832)/3.1138:null,ecmD:pdOk?pd.date:null,
       eff:f7>=0.3&&m7?m7/f7:null,rumT:r7.length>=4&&rp.length>=4&&med(rp)>0?(med(r7)/med(rp)-1)*100:null,al:id?al[id]||null:null};
   });
@@ -2062,7 +2070,7 @@ function zG1(el){
   rows.sort((a,b)=>{const x=sv(a),y=sv(b);if(x==null&&y==null)return(a.nr??1e9)-(b.nr??1e9);if(x==null)return 1;if(y==null)return -1;return(x-y)*sd||(a.nr??1e9)-(b.nr??1e9)});
   const sg=v=>v==null?'–':(v>=0?'+':'')+fNum(v);
   const cell=(r,k)=>{switch(k){
-    case'nr':return`<td><span class="ltd ${r.lt?'lt-'+r.lt:''}"></span><b>${esc(r.nr??'?')}</b>${stBadge(r.c)} <span class="muted">${esc(r.c.nazwa||'')}</span></td>`;
+    case'nr':return`<td><span class="ltd ${r.lt?'lt-'+r.lt:''}"></span><b>${esc(r.nr??'?')}</b>${stBadge(r.c)}${ftBadge(r.ft)} <span class="muted">${esc(r.c.nazwa||'')}</span></td>`;
     case'dim':return`<td class="n">${r.dim??'–'}</td>`;
     case'lim':return r.ft===0?`<td class="n bad" title="W karcie krowy w Infodexie ustawiono „Brak żywienia” – stacja nic jej nie wyda.">brak żyw.</td>`:`<td class="n ${r.limSrc==='est'?'est':''}" title="${r.limSrc==='est'?'Szacunek: największe dzienne pobranie z 7 dni (brak odczytu planu dawek)':'Dawka ustawiona w Infodexie (wzorzec żywienia krowy) na jej dzień laktacji'}">${r.lim!=null?(r.limSrc==='est'?'~':'')+fNum(r.lim):'–'}</td>`;
     case'fy':return`<td class="n">${fNum(r.fy)}</td>`;
@@ -2099,6 +2107,7 @@ function zG1(el){
     ${rows.map(r=>`<tr data-k="${esc(r.k)}" class="${r.wrong?'wrong':''}" style="cursor:pointer">${G1COLS.map(([k])=>cell(r,k)).join('')}</tr>`).join('')||`<tr><td colspan="${G1COLS.length}" class="muted">Brak krów w tym widoku.</td></tr>`}
     ${rows.length>1?`<tr class="tot"><td>Średnia (${rows.length})</td>${G1COLS.slice(1).map(([k])=>k==='al'?'<td></td>':k==='use'?`<td class="n ${useCls(tot.use)}">${tot.use!=null?fNum(tot.use,0)+'%':'–'}</td>`:k==='trend'?`<td class="n">${sg(tot.trend)}</td>`:k==='rumT'?`<td class="n">${tot.rumT==null?'–':(tot.rumT>=0?'+':'')+fNum(tot.rumT,0)+'%'}</td>`:k==='dim'?`<td class="n">${fNum(tot.dim,0)}</td>`:`<td class="n">${fNum(tot[k])}</td>`).join('')}</tr>`:''}
     </tbody></table></div>
+    <div class="lgd" style="margin-top:8px"><span><span class="stb">S</span> pobiera paszę ze stacji</span><span><span class="stb bad">S!</span> stacja, a nie Grupa 1</span><span><span class="stb off">S</span> Grupa 1 bez paszy 3 dni</span><span>${ftBadge(2)} żywienie indywidualne</span><span>${ftBadge(1)} żywienie grupowe (tabela)</span><span>${ftBadge(0)} brak żywienia w Infodexie</span></div>
     <p class="muted" style="margin-top:8px">${planTxt}</p>
     <details style="margin-top:6px"><summary><b>Jak czytać kolumny</b></summary><div class="hist" style="margin-top:6px">
       <div><b>Limit</b> – dzienna dawka paszy przypisana krowie na stacji. <b>Wykorzystanie limitu</b> – średnie pobranie z 7 dni podzielone przez limit (<span class="u-a">żółte</span> poniżej ${s.limitZolty}%, <span class="u-r">czerwone</span> poniżej ${s.limitCzerwony}%; próg zmienisz w Ustawieniach). Krowa, która nie wyjada dawki, może mieć problem zdrowotny, za wysoki limit albo kłopot z dostępem do stacji.</div>
