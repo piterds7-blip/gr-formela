@@ -165,6 +165,10 @@ tbody tr:hover{background:#F7FAF6;cursor:pointer}
 .woz.woz-g1{border-top:5px solid var(--g1)}.woz.woz-g2{border-top:5px solid var(--g2)}.woz.woz-zas{border-top:5px solid var(--zas)}
 .wlgd{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin-top:8px}.wlgd>span[class^="wt-"]{padding-left:8px}.wlgd .wt-o{border-left:5px solid #3B8B4B}.wlgd .wt-t{border-left:5px solid #C98A1B}.wlgd .wt-m{border-left:5px solid #7E57C2}
 .wzd tr.wt-o td:first-child{border-left:4px solid #3B8B4B}.wzd tr.wt-t td:first-child{border-left:4px solid #C98A1B}.wzd tr.wt-m td:first-child{border-left:4px solid #7E57C2}.hlf{font-size:12px;white-space:nowrap}
+.kpi b.warn,.kpi .muted b.warn{font-size:12px!important;line-height:1.3;display:block;font-weight:600}
+.cow.zmilk{background:#E3F2E1}.cow.zdry{background:#FBEDEC}.cow .zm{color:#2F6B3A}.cow .nomilk{display:block;color:#8A948B;font-size:11.5px}
+.col-sub{font-size:12px;color:#5E6B60;padding:2px 8px 6px}.col-sub.warn{color:#2F6B3A;font-weight:600}.nomlist{display:inline}.nomlist summary{cursor:pointer;display:inline;color:#8a6100}.nomlist div{padding:1px 0 1px 8px}
+.zg>div{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #EEF1EC;flex-wrap:wrap}
 .nebtn{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}.tile.gtile-g1{border-top:4px solid var(--g1)}.tile.gtile-g2{border-top:4px solid var(--g2)}
 .ftb{display:inline-block;margin-left:3px;vertical-align:3px;font-size:11px;font-weight:800;line-height:16px;min-width:16px;padding:0 3px;text-align:center;border-radius:4px;cursor:help}.ftb-i{background:#E3ECF7;color:#2F5F96;border:1px solid #9FB9DA}.ftb-g{background:#E8F0E9;color:#2F6B3A;border:1px solid #9CC3A3}.ftb-b{background:var(--c-red);color:#fff}.wzd select[data-ft]{width:150px}.wzd select[data-ut]{width:110px}.wzt td,.wzt th{white-space:normal}@media(max-width:600px){.wzt td,.wzt th{padding:6px 5px;font-size:13px}}
 .wzd input{padding:4px 6px;font-size:13px}.wzd .w60{width:60px}.wzd .w70{width:70px}.wzd .w80{width:80px}.wzd .wn{width:100px;display:block;margin-bottom:3px}.wzd select{font-size:12px;width:100px}.wzd td,.wzd th{padding:4px 6px;vertical-align:middle}.nowrap{white-space:nowrap}
@@ -300,7 +304,7 @@ const firebaseConfig={
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.11.0';
+const APP_VER='0.12.0';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
@@ -570,14 +574,19 @@ async function runAutoGroups(){
   if(S.autoBusy||!ixHas()||!S.farm)return;
   const key=((IX.meta&&IX.meta.at)||'')+'|'+IX.d.ref+'|'+Object.keys(S.farm.cows).length;
   if(S.autoKey===key)return;S.autoKey=key;
-  const mv=autoGroupMoves();if(!mv.length)return;
+  const mv=autoGroupMoves();
+  // numer krowy = ID z Infodexu (krowy połączone po kolczyku)
+  const nrFix=[];ixL();for(const c of activeCows()){const id=IXL.app2ix[c.kolczyk];if(!id)continue;const h=ixCows()[id]||{};
+    if(normEar(h.ear)!==c.kolczyk&&!(c.earIx&&normEar(c.earIx)===normEar(h.ear)))continue;if(String(c.nr)!==String(id))nrFix.push({c,id})}
+  if(!mv.length&&!nrFix.length)return;
   S.autoBusy=true;
   try{
     const at=nowISO(),patches=[],moves=[];
+    nrFix.forEach(({c,id})=>patches.push({k:c.kolczyk,f:{nr:+id,nrPrev:c.nr??null,nrAt:at,updatedAt:at}}));
     mv.forEach(({c,to,why},i)=>{patches.push({k:c.kolczyk,f:{grupa:to,grupaOd:at,updatedAt:at}});
       moves.push({id:at.replace(/\D/g,'')+i+'-'+c.kolczyk,kolczyk:c.kolczyk,nr:c.nr??null,z:gOf(c),na:to,at,powod:why})});
     if(await commit({patches,moves})){applyPatches(patches);S.farm.moves.unshift(...moves.slice().reverse());
-      toast(`Automatycznie przeniesiono ${mv.length} ${mv.length===1?'krowę':mv.length<5?'krowy':'krów'} (szczegóły w Dziś)`);render()}
+      toast([mv.length?`Automatycznie przeniesiono ${mv.length} ${mv.length===1?'krowę':mv.length<5?'krowy':'krów'} (szczegóły w Dziś)`:'',nrFix.length?`Numery z Infodexu: ${nrFix.length}`:''].filter(Boolean).join(' · '));render()}
   }finally{S.autoBusy=false}
 }
 function autoMovesCard(){
@@ -653,6 +662,58 @@ function sortCol(g,a,b){
 function kgOf(c){const L=lac(c);if(L.id){const v=ixMilk7(L.id);if(v!=null)return v}return c.ostPd?.kg??null}
 function ixMilk7(id){const D=IX.d,ser=D.ser[id]||{};const l=dRange(addDays(D.ref,-6),D.ref).filter(d=>ser[d]&&ser[d].m>0&&!oneMilkAt(ser,d)).map(d=>ser[d].m);return l.length?avg(l):null}
 /* pobór paszy ze stacji (Infodex): on = pobiera (≥0,3 kg w ostatnich 2 dniach), none3 = 3 dni bez paszy, choć jest dojona */
+/* mleko krowy „wczoraj” (ostatni pełny dzień) i powód braku */
+function milkStat(c){
+  if(!ixHas())return null;
+  const L=lac(c),id=L.id,D=IX.d,R=D.ref;
+  if(!id)return{y:null,why:'brak w Infodexie',noix:true};
+  const ser=D.ser[id]||{},r=ser[R]||{};
+  if(r.m>0)return{y:r.m,one:oneMilkAt(ser,R)};
+  const h=ixCows()[id]||{};
+  const last=Object.keys(ser).filter(d=>d<=R&&ser[d].m>0).sort().pop()||null;
+  const why=L.zas||h.state===3?'zasuszona w Infodexie':h.lc===4?'siara':last?`brak udoju od ${fD2(addDays(last,1))}`:'brak udojów w danych';
+  return{y:null,why,last};
+}
+/* zgodność aplikacji z Infodexem */
+const HLT={ear:x=>`ID ${x.id}: inny kolczyk (${x.old||'brak'} → ${x.new||'brak'}) – numer przejęła inna krowa`,renum:x=>`kolczyk ${x.ear}: numer w Infodexie ${x.from} → ${x.to} (ta sama krowa)`,rfid:x=>`responder ${x.rfid} przełożony z ${x.from||'?'} na ${x.to||'?'}`,gone:x=>`ID ${x.id} (${x.ear||'bez kolczyka'}) zniknęło z Infodexu`,'new':x=>`nowe ID ${x.id} (${x.ear||'bez kolczyka'})`};
+function zgodnoscData(){
+  if(!ixHas())return null;ixL();
+  const D=IX.d,R=D.ref,herd=ixCows(),lim=addDays(todayISO(),-60);
+  const log=(IX.herdlog||[]).filter(x=>(x.d||'')>=lim).slice().reverse();
+  const nr=activeCows().filter(c=>c.nrAt&&c.nrAt.slice(0,10)>=addDays(todayISO(),-14));
+  const noix=activeCows().filter(c=>!IXL.app2ix[c.kolczyk]);
+  const recent=id=>dRange(addDays(R,-6),R).some(d=>((D.ser[id]||{})[d]||{}).m>0);
+  const noapp=Object.keys(herd).filter(id=>!IXL.ix2app[id]&&recent(id));
+  const ear=IXL.issues.filter(i=>i.t==='ear').map(i=>({...i,c:S.farm.cows[i.k]})).filter(x=>x.c&&!x.c.earIx);
+  const stale=activeCows().filter(c=>gOf(c)!=='zas'&&IXL.app2ix[c.kolczyk]).map(c=>({c,m:milkStat(c)})).filter(x=>x.m&&!(x.m.y>0)&&x.m.why!=='zasuszona w Infodexie'&&(!x.m.last||x.m.last<addDays(R,-14)));
+  return{log,nr,noix,noapp,ear,stale,n:noix.length+noapp.length+ear.length+stale.length};
+}
+function zgodnoscCard(){
+  const Z=zgodnoscData();if(!Z||(!Z.n&&!Z.log.length&&!Z.nr.length))return'';
+  return`<div class="card no-print"><details${S.zgOpen?' open':''} id="zgDet"><summary style="cursor:pointer"><b>Zgodność z Infodexem</b>${Z.n?` <span class="stb bad">${Z.n}</span> do wyjaśnienia`:' <span class="muted">– bez spraw do wyjaśnienia</span>'}${Z.log.length?` · zmian w Infodexie: ${Z.log.length}`:''}</summary>
+    <p class="muted">Hodowcy nie prowadzą w Infodexie „Ubyłych” – numer i responder krowy, która wypadła, dostaje nowa krowa. Tu widać, co się nie zgadza.</p>
+    ${Z.noix.length?`<h3>W aplikacji, a nie ma w Infodexie (${Z.noix.length})</h3><p class="muted">Prawdopodobnie ubyły (sprzedane, wybrakowane) albo ich kolczyk w Infodexie jest inny.</p><div class="zg">${Z.noix.map(c=>`<div><b>${esc(c.nr??'?')}</b> ${esc(c.nazwa||'')} <span class="muted">${esc(c.kolczyk)} · ${chip(gOf(c))}</span><span class="spacer"></span><button class="btn sm" data-zgone="${esc(c.kolczyk)}">Ubyła</button></div>`).join('')}</div>`:''}
+    ${Z.stale.length?`<h3>W grupie, a niedojone od ponad 14 dni (${Z.stale.length})</h3><p class="muted">Nie są zasuszone w Infodexie, a hala nie zapisuje ich mleka. Najczęściej krowa ubyła, a jej numer/responder czeka na nową krowę.</p><div class="zg">${Z.stale.map(x=>`<div><b>${esc(x.c.nr??'?')}</b> ${esc(x.c.nazwa||'')} <span class="muted">${esc(x.c.kolczyk)} · ${chip(gOf(x.c))} · ${esc(x.m.why)}</span><span class="spacer"></span><button class="btn sm" data-zgone="${esc(x.c.kolczyk)}">Ubyła</button></div>`).join('')}</div>`:''}
+    ${Z.ear.length?`<h3>Połączone po numerze, ale inny kolczyk (${Z.ear.length})</h3><div class="zg">${Z.ear.map(x=>`<div><b>${esc(x.c.nr??'?')}</b> <span class="muted">aplikacja: ${esc(x.k)} · Infodex ID ${esc(x.id)}: ${esc((ixCows()[x.id]||{}).ear||'brak')}</span><span class="spacer"></span><button class="btn sm" data-zsame="${esc(x.k)}|${esc(x.id)}">Ta sama krowa</button><button class="btn sm" data-zgone="${esc(x.k)}">Inna – stara ubyła</button></div>`).join('')}</div>`:''}
+    ${Z.noapp.length?`<h3>W Infodexie (dojone), a nie ma w aplikacji (${Z.noapp.length})</h3><div class="zg">${Z.noapp.map(id=>{const h=ixCows()[id]||{};return`<div><b>ID ${esc(id)}</b> <span class="muted">${esc(h.ear||'bez kolczyka')} · ${LCN[h.lc]??''}</span><span class="spacer"></span><button class="btn sm" data-zadd="${esc(id)}">Dodaj do aplikacji</button></div>`}).join('')}</div>`:''}
+    ${Z.nr.length?`<h3>Numery poprawione na ID z Infodexu (14 dni)</h3><div class="zg">${Z.nr.map(c=>`<div>${esc(c.nazwa||c.kolczyk)}: <b>${esc(c.nrPrev??'?')} → ${esc(c.nr)}</b> <span class="muted">${fD2(c.nrAt.slice(0,10))}</span></div>`).join('')}</div>`:''}
+    ${Z.log.length?`<h3>Zmiany w Infodexie (60 dni, z agenta)</h3><div class="zg">${Z.log.map(x=>`<div><span class="muted">${fD2(x.d)}${x.d0?` (od ${fD2(x.d0)})`:''}</span> ${esc((HLT[x.t]||(()=>x.t))(x))}</div>`).join('')}</div>`:''}
+  </details></div>`;
+}
+function bindZgodnosc(){
+  const det=$('#zgDet');if(det)det.ontoggle=()=>{S.zgOpen=det.open};
+  document.querySelectorAll('[data-zgone]').forEach(b=>b.onclick=async()=>{const c=S.farm.cows[b.dataset.zgone];if(!c||!confirm(`Oznaczyć krowę ${c.nr??''} (${c.kolczyk}) jako ubyłą? Zniknie z grup; znajdziesz ją w Stado → Usunięte.`))return;
+    const at=nowISO(),f={aktywna:false,gone:true,updatedAt:at};if(await commit({patches:[{k:c.kolczyk,f}]})){applyPatches([{k:c.kolczyk,f}]);toast('Oznaczono jako ubyłą');render()}});
+  document.querySelectorAll('[data-zsame]').forEach(b=>b.onclick=async()=>{const[k,id]=b.dataset.zsame.split('|');const h=ixCows()[id]||{};const f={earIx:h.ear||'',updatedAt:nowISO()};
+    if(await commit({patches:[{k,f}]})){applyPatches([{k,f}]);toast('Zapisano: to ta sama krowa');render()}});
+  document.querySelectorAll('[data-zadd]').forEach(b=>b.onclick=async()=>{const id=b.dataset.zadd,h=ixCows()[id]||{},k=normEar(h.ear)||('IX'+id);
+    if(S.farm.cows[k]&&S.farm.cows[k].aktywna!==false)return toast('Taka krowa już jest w aplikacji');
+    const x=ixLacId(id),dim=x&&x.cd?dayDiff(x.cd,todayISO()):null,at=nowISO();
+    const g=h.state===3?'zas':dim!=null&&dim<(S.farm.settings.dimG1G2||200)?'g1':'g2';
+    const cow={kolczyk:k,nr:+id,nazwa:'',grupa:g,grupaOd:at,aktywna:true,createdAt:at,updatedAt:at};
+    const mv={id:at.replace(/\D/g,'')+'-'+k,kolczyk:k,nr:+id,z:'brak',na:g,at,powod:'dodana z Infodexu'};
+    if(await commit({cows:[cow],moves:[mv]})){S.farm.cows[k]=cow;S.farm.moves.unshift(mv);LACC.clear();toast(`Dodano krowę ${id} → ${GR[g].n}`);render()}});
+}
 /* ostatnie przeniesienie krowy (z historii) */
 function lastMove(c){return(S.farm.moves||[]).find(m=>m.kolczyk===c.kolczyk)||null}
 const moveIsAuto=m=>!!m&&(m.powod||'').startsWith('auto:');
@@ -704,8 +765,12 @@ function cowCard(c){
   if(g==='zas'||L.zas){const pw=planWyc(c);dimTxt=pw?`wyc. za ${dayDiff(todayISO(),pw)} dni`:'zasuszona'}
   const pd=c.ostPd,pdCur=pd&&(!L.dataWyc||pd.date>=L.dataWyc);
   const kg=kgOf(c),kgIx=L.id&&ixMilk7(L.id)!=null;
-  const meta=[L.id&&ixHas()&&(ixCows()[L.id]||{}).lc===4?'<b class="siara">siara</b>':'',L.lakt?`lakt. ${L.lakt}`:'',kg!=null?`${fNum(kg)} kg${kgIx?'':' (PD)'}`:'',L.zas&&g!=='zas'?'zasuszona':'',pdCur&&pd.info?esc(pd.info):''].filter(Boolean).join(' · ');
-  return `<div class="cow${over?' over':''}${lt?' lt-'+lt:''}${S.sel.has(c.kolczyk)?' sel':''}" data-k="${esc(c.kolczyk)}" ${!S.selMode?'draggable="true"':''}>
+  const ms=milkStat(c);
+  const zMilk=g==='zas'&&ms&&ms.y>0,zDry=g==='zas'&&ms&&!(ms.y>0);
+  const kgTxt=zMilk?`<b class="zm">doi: ${fNum(ms.y,1)} kg wczoraj</b>`:g==='zas'?(kg!=null&&!kgIx?`ostatni PD: ${fNum(kg)} kg`:''):kg!=null?`${fNum(kg)} kg${kgIx?'':' (PD)'}`:'';
+  const noMilk=(g==='g1'||g==='g2')&&ms&&!(ms.y>0)?`<span class="nomilk">brak mleka wczoraj${ms.why?' – '+esc(ms.why):''}</span>`:'';
+  const meta=[L.id&&ixHas()&&(ixCows()[L.id]||{}).lc===4?'<b class="siara">siara</b>':'',L.lakt?`lakt. ${L.lakt}`:'',kgTxt,L.zas&&g!=='zas'?'zasuszona':'',pdCur&&pd.info?esc(pd.info):''].filter(Boolean).join(' · ')+noMilk;
+  return `<div class="cow${over?' over':''}${lt?' lt-'+lt:''}${zMilk?' zmilk':''}${zDry?' zdry':''}${S.sel.has(c.kolczyk)?' sel':''}" data-k="${esc(c.kolczyk)}" ${!S.selMode?'draggable="true"':''}>
     <span class="nr">${esc(c.nr??'?')}${stBadge(c)}</span><span class="nm">${esc(c.nazwa||c.kolczyk)}</span>
     <span class="dim">${dimTxt}</span>
     <span class="meta">${meta}${L.fresh&&d!=null&&d<=60?`<span class="fresh-b" title="Wycielenie ${fDate(L.dataWyc)} zapisane w Infodexie. Nie ma go jeszcze w próbnym doju.">nowe wycielenie</span>`:''}${pinned(c)?'<span class="pin" title="Przypięta">📌</span>':''}${sg?`<span class="hint">→ ${GR[sg.to].s}</span>`:''}</span></div>`;
@@ -723,10 +788,14 @@ function renderGrupy(){
   const colHtml=g=>{
     const list=cows.filter(c=>gOf(c)===g&&matchQ(c)).sort((a,b)=>sortCol(g,a,b));
     return `<div class="col${S.mobCol===g?' mob':''}" data-g="${g}"><div class="col-h"><b>${GR[g].n}</b>${S.selMode&&list.length?`<button class="sel-all" data-selall="${g}">zaznacz</button>`:''}<span class="n">${cnt[g]}</span></div>
+      ${(()=>{if(!ixHas()||g==='brak')return'';const all=activeCows().filter(c=>gOf(c)===g),st=all.map(c=>({c,m:milkStat(c)}));const dm=st.filter(x=>x.m&&x.m.y>0),no=st.filter(x=>!(x.m&&x.m.y>0));
+        if(g==='zas')return dm.length?`<div class="col-sub warn">${dm.length} ${dm.length===1?'krowa doi':'krowy doją'} mimo grupy Zasuszone</div>`:'';
+        return`<div class="col-sub">dojonych wczoraj: <b>${dm.length}</b>${no.length?` · <details class="nomlist"><summary>bez mleka wczoraj: ${no.length}</summary>${no.map(x=>`<div><b>${esc(x.c.nr??'?')}</b> – ${esc(x.m?x.m.why:'')}</div>`).join('')}</details>`:''}</div>`})()}
       ${list.map(cowCard).join('')||'<div class="muted" style="padding:8px">—</div>'}</div>`;
   };
   const wrong=stWrong();
   $('#main').innerHTML=`
+  ${zgodnoscCard()}
   ${wrong.length?`<div class="card no-print stwarn"><div class="row"><span class="stb bad">S!</span><div><b>Pobierają paszę ze stacji, a w aplikacji nie są w Grupie 1 (${wrong.length})</b><div class="muted">Do stacji ma dostęp tylko Grupa 1, więc przypisanie w aplikacji jest prawdopodobnie złe.</div></div><span class="spacer"></span><button class="btn sm pri" id="wrongAll">Wszystkie → Grupa 1</button></div>
     <div class="sug-list">${wrong.map(c=>{const st=stWrongInfo(c),iss=ixIssueOf(lac(c).id),mt=moveTxt(c);return `<div class="sug"><span></span><span class="nr">${esc(c.nr??'?')}</span><div><span class="arrow">${chip(gOf(c))}</span> <span class="why">stacja: ${fD2(IX.d.ref)} ${fNum(st.y)} kg, dzień wcześniej ${fNum(st.y1)} kg${mt?` · <b>${esc(mt)}</b>`:''}${st.manual?' · <b class="warn">przeniesiona ręcznie, a dalej je ze stacji – czy na pewno stoi w innej grupie?</b>':''}${iss?` · <b class="warn">uwaga: ${esc(iss.msg)}</b>`:''}</span></div><div class="acts"><button class="btn sm" data-wr="${esc(c.kolczyk)}">→ Grupa 1</button></div></div>`}).join('')}</div></div>`:''}
   ${sugs.length?`<div class="card no-print"><div class="sug-head"><span class="sug-count">${sugs.length}</span><div><b>${sugs.length===1?'krowa do przeniesienia':'krów do przeniesienia'}</b><div class="muted">Podpowiedzi według dnia laktacji i próbnego doju. Nic nie przesuwa się bez Twojego potwierdzenia.</div></div>
@@ -747,7 +816,7 @@ function renderGrupy(){
   <div class="drag-hint no-print">Przytrzymaj krowę i przeciągnij ją na nazwę grupy powyżej.</div>
   <div class="board" id="board">${GORDER.map(colHtml).join('')}</div>
   ${lacLegend()}`;
-  bindGrupy();
+  bindGrupy();bindZgodnosc();
   const wa=$('#wrongAll');if(wa)wa.onclick=()=>moveCows(wrong,'g1','pobiera paszę ze stacji');
   document.querySelectorAll('[data-wr]').forEach(b=>b.onclick=()=>{const c=S.farm.cows[b.dataset.wr];if(c)moveCows([c],'g1','pobiera paszę ze stacji')});
 }
@@ -1413,14 +1482,14 @@ async function ixLoad(){
   try{
     let kv={},days={};
     try{kv=await IXDB.getAll('kv');days=await IXDB.getAll('days')}catch(e){console.warn('IX cache',e)}
-    if(kv.meta){IX.meta=kv.meta;IX.herd=kv.herd||null;IX.events=(kv.events&&kv.events.list)||[];IX.feed=kv.feed||null;IX.days=days;ixBuild();ixRerender()}
+    if(kv.meta){IX.meta=kv.meta;IX.herd=kv.herd||null;IX.events=(kv.events&&kv.events.list)||[];IX.feed=kv.feed||null;IX.herdlog=(kv.herdlog&&kv.herdlog.list)||[];IX.days=days;ixBuild();ixRerender()}
     if(!LOCAL&&db){
       const fr=db.collection('farms').doc(S.farmId);
       const ms=await fr.collection('ix').doc('meta').get();
       if(ms.exists){
         const m=ms.data();
         if(!kv.meta||kv.meta.at!==m.at||kv.meta.imported!==m.imported){
-          const [h,e,fd]=await Promise.all([fr.collection('ix').doc('herd').get(),fr.collection('ix').doc('events').get(),fr.collection('ix').doc('feed').get()]);
+          const [h,e,fd,hl]=await Promise.all([fr.collection('ix').doc('herd').get(),fr.collection('ix').doc('events').get(),fr.collection('ix').doc('feed').get(),fr.collection('ix').doc('herdlog').get()]);
           const known=Object.keys(days).sort();
           let q=fr.collection('ix_days');
           // agent wysyła 10 ostatnich dni – pobieram tylko je (mniej odczytów z bazy)
@@ -1428,8 +1497,8 @@ async function ixLoad(){
           const ds=await q.get();
           const nd={};ds.forEach(x=>{nd[x.id]=x.data()});
           Object.assign(days,nd);
-          IX.meta=m;IX.herd=h.exists?h.data():null;IX.events=e.exists?(e.data().list||[]):[];IX.days=days;IX.feed=fd.exists?fd.data():null;
-          try{await IXDB.putMany('days',nd);await IXDB.putMany('kv',{meta:m,herd:IX.herd,events:{list:IX.events},feed:IX.feed})}catch(err){console.warn(err)}
+          IX.meta=m;IX.herd=h.exists?h.data():null;IX.events=e.exists?(e.data().list||[]):[];IX.days=days;IX.feed=fd.exists?fd.data():null;IX.herdlog=hl.exists?(hl.data().list||[]):[];
+          try{await IXDB.putMany('days',nd);await IXDB.putMany('kv',{meta:m,herd:IX.herd,events:{list:IX.events},feed:IX.feed,herdlog:{list:IX.herdlog}})}catch(err){console.warn(err)}
           ixBuild();ixRerender();
         }
       }
@@ -1451,6 +1520,12 @@ function ixBuild(){
   IX.fp=undefined;LACC.clear();
   const ser={};
   for(const dt of D.dates){const c=(IX.days[dt]||{}).c||{};for(const id in c)(ser[id]=ser[id]||{})[dt]=c[id]}
+  // dziennik zmian stada z agenta: ID użyte ponownie (inny kolczyk) – odcinam historię poprzedniego zwierzęcia;
+  // ta sama krowa pod nowym numerem – doklejam jej historię spod starego numeru
+  for(const x of (IX.herdlog||[])){
+    if(x.t==='ear'&&ser[x.id]){const cut=x.d0?addDays(x.d0,1):x.d;for(const dt in ser[x.id])if(dt<cut)delete ser[x.id][dt]}
+    if(x.t==='renum'&&ser[x.from]){const to=ser[x.to]=ser[x.to]||{},lim=x.d0||x.d;for(const dt in ser[x.from])if(dt<=lim&&!to[dt])to[dt]=ser[x.from][dt]}
+  }
   D.ser=ser;
   const ev={};(IX.events||[]).forEach(e=>{(ev[e.c]=ev[e.c]||[]).push(e)});
   Object.values(ev).forEach(l=>l.sort((a,b)=>a.d.localeCompare(b.d)));
@@ -1477,9 +1552,12 @@ const dRange=(a,b)=>{const out=[];for(let d=a;d<=b;d=addDays(d,1))out.push(d);re
 function ixLinks(){
   const app=S.farm.cows,herd=ixCows();
   const L={ix2app:{},app2ix:{},issues:[]};const used=new Set();
-  for(const id in herd){const e=normEar(herd[id].ear);if(e&&app[e]){L.ix2app[id]=e;L.app2ix[e]=id;used.add(e)}}
-  const byNr={};Object.values(app).forEach(c=>{if(c.aktywna!==false&&c.nr!=null&&!used.has(c.kolczyk))byNr[c.nr]=c.kolczyk});
-  for(const id in herd){if(L.ix2app[id])continue;const k=byNr[+id];
+  const alt={};Object.values(app).forEach(c=>{if(c.earIx)alt[normEar(c.earIx)]=c.kolczyk});
+  for(const id in herd){const e=normEar(herd[id].ear),k=e&&(app[e]?e:alt[e]);if(k&&app[k]&&!used.has(k)){L.ix2app[id]=k;L.app2ix[k]=id;used.add(k)}}
+  // numer w Infodexie użyty ponownie dla innej krowy (zmiana kolczyka pod tym ID) – nie łączę po numerze
+  const reused=new Set((IX.herdlog||[]).filter(x=>x.t==='ear').map(x=>String(x.id)));
+  const byNr={};Object.values(app).forEach(c=>{if(c.aktywna!==false&&!c.gone&&c.nr!=null&&!used.has(c.kolczyk))byNr[c.nr]=c.kolczyk});
+  for(const id in herd){if(L.ix2app[id]||reused.has(String(id)))continue;const k=byNr[+id];
     if(k){L.ix2app[id]=k;L.app2ix[k]=id;used.add(k);L.issues.push({t:'ear',id,k,msg:`Krowa ${id}: kolczyk w Infodexie (${herd[id].ear||'brak'}) różni się od kolczyka z próbnego doju (${k}). Połączono po numerze.`})}}
   for(const id in herd){const k=L.ix2app[id];if(k&&app[k].nr!=null&&String(app[k].nr)!==String(id))L.issues.push({t:'nr',id,k,msg:`Kolczyk ${k}: w Infodexie to krowa nr ${id}, a w próbnym doju nr ${app[k].nr}.`})}
   for(const id in herd)if(!L.ix2app[id])L.issues.push({t:'noapp',id,msg:`Krowa ${id} (${herd[id].ear||'bez kolczyka'}) jest w Infodexie, ale nie ma jej w aplikacji.`});
@@ -1533,9 +1611,18 @@ function ixRepro(id){
 function ixLact(id){
   const D=IX.d;if(D.lact[id])return D.lact[id];
   const ser=D.ser[id]||{},segs=[];
+  const calvs=((D.ev[id])||[]).filter(e=>e.t===5).map(e=>e.d.slice(0,10)).sort();
+  let lastDt=null,gapCd=null;
   for(const dt of Object.keys(ser).sort()){if(dt>D.ref)continue;
     const r=ser[dt];if(!r.m||r.dim==null||r.dim<0)continue;
-    const cd=addDays(dt,-r.dim);
+    let cd=addDays(dt,-r.dim);
+    // raport dzienny po wycieleniu podaje jeszcze stary dzień laktacji – wycielenie ze zdarzenia ma pierwszeństwo
+    const ev=[...calvs].reverse().find(c=>c<=dt);
+    if(ev&&ev>addDays(cd,30))cd=ev;
+    // przerwa w udojach > 30 dni bez zdarzenia wycielenia = nowa laktacja od pierwszego udoju po przerwie
+    if(lastDt&&dayDiff(lastDt,dt)>30&&!(ev&&ev>lastDt)&&dayDiff(cd,dt)>30)gapCd=dt;
+    if(gapCd&&cd<gapCd)cd=gapCd;
+    lastDt=dt;
     let sg=segs[segs.length-1];
     // nowa laktacja tylko gdy data wycielenia przesunęła się o > 200 dni; mniejsze różnice to poprawki daty w Infodexie
     if(!sg||dayDiff(sg.cd,cd)>200){sg={cd,pts:[]};segs.push(sg)}
@@ -1629,7 +1716,7 @@ function ixAlerts(){
     const reasons=[];let sev=0;
     const pm=prev.filter(d=>ser[d]&&!oneMilkAt(ser,d)).map(d=>ser[d].m).filter(x=>x>0);
     const mMed=med(pm);
-    const dimR=r&&r.dim!=null?r.dim:h.dim;
+    const xl=ixLacId(id),dimR=xl&&xl.cd&&R>=xl.cd?dayDiff(xl.cd,R):(r&&r.dim!=null?r.dim:h.dim);
     if(r&&r.m>0&&oneMilkAt(ser,R)){reasons.push({c:'a',t:`prawdopodobnie zapisany tylko jeden udój (${fNum(r.m)} kg, zwykle ${fNum(mMed)} kg) – nie wydojona albo nie rozpoznana w hali?`});sev+=2}
     else if(r&&r.m>0&&pm.length>=4&&mMed>=10&&dimR>7){
       const ch=(r.m/mMed-1)*100;
@@ -1807,10 +1894,11 @@ async function ixImport(file){
       await fr.collection('ix').doc('herd').set(d.herd);
       await fr.collection('ix').doc('events').set(d.events||{at:d.exported,list:[]});
       if(d.feed)await fr.collection('ix').doc('feed').set(d.feed);
+      if(d.herdlog)await fr.collection('ix').doc('herdlog').set(d.herdlog);
       await fr.collection('ix').doc('meta').set(meta,{merge:true});
     }
-    try{await IXDB.putMany('days',d.days);await IXDB.putMany('kv',{meta,herd:d.herd,events:d.events||{list:[]},feed:d.feed||IX.feed})}catch(e){console.warn(e)}
-    Object.assign(IX.days,d.days);IX.meta=meta;IX.herd=d.herd;IX.events=(d.events&&d.events.list)||[];if(d.feed)IX.feed=d.feed;
+    try{await IXDB.putMany('days',d.days);await IXDB.putMany('kv',{meta,herd:d.herd,events:d.events||{list:[]},feed:d.feed||IX.feed,herdlog:d.herdlog||{list:IX.herdlog||[]}})}catch(e){console.warn(e)}
+    Object.assign(IX.days,d.days);IX.meta=meta;IX.herd=d.herd;IX.events=(d.events&&d.events.list)||[];if(d.feed)IX.feed=d.feed;if(d.herdlog)IX.herdlog=d.herdlog.list||[];
     ixBuild();
     say(`Gotowe. Wczytano ${days.length} dni, ${Object.keys(d.herd.cows||{}).length} krów.`);
     toast('Wczytano dane z Infodexu');
@@ -1910,7 +1998,7 @@ function renderDzis(){
 }
 
 /* ================== KARTA KROWY: CZĘŚĆ INFODEX ================== */
-function roll7(pts){return pts.map((p,i)=>{const w=pts.filter(q=>q.dim>p.dim-7&&q.dim<=p.dim);return{x:p.dim,y:avg(w.map(q=>q.m))}})}
+function roll7(pts){const o=[];pts.forEach((p,i)=>{if(i&&p.dim-pts[i-1].dim>10)o.push({x:p.dim-1,y:null});const w=pts.filter(q=>q.dim>p.dim-7&&q.dim<=p.dim);o.push({x:p.dim,y:avg(w.map(q=>q.m))})});return o}
 function ixOnlySheet(id){
   const h=ixCows()[id]||(IX.herd&&IX.herd.heifers||{})[id]||{};
   openModal(`<div class="row"><h2 style="margin:0">Krowa ${esc(id)}</h2><span class="spacer"></span><button class="btn sm" data-close>Zamknij</button></div>
@@ -1929,7 +2017,7 @@ function feedSeries(id){
   const D=IX.d,R=D.ref,ser=D.ser[id]||{},P=ixFeedPlan(),cd=dRange(addDays(R,-59),R),h=ixCows()[id]||{};
   const x=ixLacId(id),cdc=x&&x.cd;
   const dose=cd.map(d=>{if(!P||!P.ok)return null;if(h.feedType===0)return 0;const r=ser[d]||{};
-    const dd=r.dim!=null?r.dim:(cdc&&d>=cdc?dayDiff(cdc,d):null);
+    const dd=cdc&&d>=cdc?dayDiff(cdc,d):(r.dim!=null?r.dim:null);
     const mm=dRange(addDays(d,-7),addDays(d,-1)).filter(z=>ser[z]&&ser[z].m>0&&!oneMilkAt(ser,z)).map(z=>ser[z].m);
     const v=planKg(P,id,{dim:dd,zas:dd==null},mm.length?avg(mm):null);return v==null?null:Math.round(v*10)/10});
   return{cd,dose,eat:cd.map(d=>{const r=ser[d];return r&&r.f!=null?Math.round(r.f/100)/10:(r&&r.m>0?0:null)}),milk:cd.map(d=>{const r=ser[d];return r&&r.m>0?r.m:null}),one:cd.map(d=>oneMilkAt(ser,d))};
@@ -1963,14 +2051,15 @@ function ixCowSection(el,id){
   const r=ser[R]||{},last7=dRange(addDays(R,-6),R).map(d=>ser[d]&&ser[d].m).filter(x=>x>0);
   const segs=ixLact(id),cur=segs[segs.length-1],prevL=segs.length>1?segs[segs.length-2]:null;
   const cls=lactCls(cur?cur.lakt:h.calv);
-  const exp=r.dim!=null?curveAt(cls,r.dim):null;
+  const xl=ixLacId(id),dimNow=xl&&xl.cd&&R>=xl.cd?dayDiff(xl.cd,R):r.dim;
+  const exp=dimNow!=null?curveAt(cls,dimNow):null;
   const tests=Object.values(S.farm.tests||{});
   const k=IXL.ix2app[id];
   const solPts=k&&cur?tests.map(t=>({t,r:(t.rows||[]).find(x=>x.kolczyk===k)})).filter(x=>x.r&&x.r.kg!=null&&x.t.date>=cur.cd).map(x=>({x:dayDiff(cur.cd,x.t.date),y:x.r.kg,tl:x.r.tl,bi:x.r.bi,moc:x.r.moc})):[];
   const evs=(D.ev[id]||[]).slice().reverse();
   el.innerHTML=`<div class="kpis" style="margin-top:12px">
     <div class="kpi"><span class="muted">Mleko ${fD2(R)}</span><b>${fNum(r.m)} kg</b><span class="muted">${oneMilkAt(ser,R)?'<b class="warn">prawdopodobnie tylko jeden udój – dzień pominięty w średniej</b>':(r.m1>0&&r.m2>0?`udój 1: ${fNum(r.m1)} · udój 2: ${fNum(r.m2)}`:'')}</span></div>
-    <div class="kpi"><span class="muted">Średnio 7 dni</span><b>${fNum(ixMilk7(id))} kg</b><span class="muted">${exp?`krzywa stada: ${fNum(exp)} kg`:''}</span></div>
+    <div class="kpi"><span class="muted">Średnio ${(()=>{const n=dRange(addDays(R,-6),R).filter(d=>ser[d]&&ser[d].m>0&&!oneMilkAt(ser,d)).length;return n<7?`z ${n} ${n===1?'dnia':'dni'}`:'7 dni'})()}</span><b>${fNum(ixMilk7(id))} kg</b><span class="muted">${exp?`krzywa stada: ${fNum(exp)} kg`:''}</span></div>
     <div class="kpi"><span class="muted">Dzień laktacji (dziś)</span><b>${(()=>{const x=ixLacId(id);return x&&x.cd?dayDiff(x.cd,todayISO()):(r.dim??h.dim??'–')})()}</b><span class="muted">laktacja ${cur&&cur.lakt?cur.lakt:(h.calv??'–')}</span></div>
     <div class="kpi"><span class="muted">Rozród</span><b style="font-size:16px">${esc(rp.stTxt)}</b><span class="muted">${rp.lastIns?`ins. ${fDate(rp.lastIns)} (${rp.insCount}×)`:'bez inseminacji'}${rp.expCalv?`<br>wycielenie ~${fDate(rp.expCalv)}`:''}</span></div>
     ${r.f?`<div class="kpi"><span class="muted">Pasza ze stacji</span><b>${fNum(r.f/1000)} kg</b></div>`:''}
