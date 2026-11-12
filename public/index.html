@@ -165,6 +165,7 @@ tbody tr:hover{background:#F7FAF6;cursor:pointer}
 .woz.woz-g1{border-top:5px solid var(--g1)}.woz.woz-g2{border-top:5px solid var(--g2)}.woz.woz-zas{border-top:5px solid var(--zas)}
 .wlgd{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin-top:8px}.wlgd>span[class^="wt-"]{padding-left:8px}.wlgd .wt-o{border-left:5px solid #3B8B4B}.wlgd .wt-t{border-left:5px solid #C98A1B}.wlgd .wt-m{border-left:5px solid #7E57C2}
 .wzd tr.wt-o td:first-child{border-left:4px solid #3B8B4B}.wzd tr.wt-t td:first-child{border-left:4px solid #C98A1B}.wzd tr.wt-m td:first-child{border-left:4px solid #7E57C2}.hlf{font-size:12px;white-space:nowrap}
+.nebtn{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}.tile.gtile-g1{border-top:4px solid var(--g1)}.tile.gtile-g2{border-top:4px solid var(--g2)}
 .ftb{display:inline-block;margin-left:3px;vertical-align:3px;font-size:11px;font-weight:800;line-height:16px;min-width:16px;padding:0 3px;text-align:center;border-radius:4px;cursor:help}.ftb-i{background:#E3ECF7;color:#2F5F96;border:1px solid #9FB9DA}.ftb-g{background:#E8F0E9;color:#2F6B3A;border:1px solid #9CC3A3}.ftb-b{background:var(--c-red);color:#fff}.wzd select[data-ft]{width:150px}.wzd select[data-ut]{width:110px}.wzt td,.wzt th{white-space:normal}@media(max-width:600px){.wzt td,.wzt th{padding:6px 5px;font-size:13px}}
 .wzd input{padding:4px 6px;font-size:13px}.wzd .w60{width:60px}.wzd .w70{width:70px}.wzd .w80{width:80px}.wzd .wn{width:100px;display:block;margin-bottom:3px}.wzd select{font-size:12px;width:100px}.wzd td,.wzd th{padding:4px 6px;vertical-align:middle}.nowrap{white-space:nowrap}
 .fnotes{margin:6px 0 0;padding-left:18px;line-height:1.55}.fnotes li{margin:4px 0}.fnotes li.bad{color:var(--c-red)}.fnotes li.warn{color:#8a6100}.siara{color:#8E44AD}
@@ -299,7 +300,7 @@ const firebaseConfig={
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.9.0';
+const APP_VER='0.10.0';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
@@ -544,6 +545,49 @@ async function moveCows(list,to,why=''){
   }
 }
 
+/* automatyczne przeniesienia: zasuszenie i wycielenie z Infodexu, pobieranie paszy ze stacji → G1 */
+function autoGroupMoves(){
+  if(!ixHas()||!S.farm)return[];ixL();
+  const D=IX.d,R=D.ref,out=[];
+  for(const c of activeCows()){
+    if(pinned(c))continue;
+    const L=lac(c);if(!L.id||L.src!=='ix')continue;
+    const g=gOf(c),od=(c.grupaOd||'').slice(0,10),ev=D.ev[L.id]||[];
+    if(L.zas){
+      if(g==='zas')continue;
+      const dz=[...ev].reverse().find(e=>e.t===4),dd=dz?dz.d.slice(0,10):null;
+      if(!od||!dd||dd>=od)out.push({c,to:'zas',why:`auto: zasuszenie w Infodexie${dd?' '+fDate(dd):''}`});
+      continue;
+    }
+    if(L.dataWyc&&(g==='zas'||g==='g2')&&dayDiff(L.dataWyc,todayISO())<=60&&(od?L.dataWyc>od:true)){out.push({c,to:'g1',why:`auto: wycielenie ${fDate(L.dataWyc)} (Infodex)`});continue}
+    if(g!=='g1'){const ser=D.ser[L.id]||{},a=ser[R]||{},b=ser[addDays(R,-1)]||{};
+      if((a.f||0)>=300&&(b.f||0)>=300&&(!od||addDays(R,-1)>od))out.push({c,to:'g1',why:`auto: pobiera paszę ze stacji (${fD2(addDays(R,-1))}–${fD2(R)})`})}
+  }
+  return out;
+}
+async function runAutoGroups(){
+  if(S.autoBusy||!ixHas()||!S.farm)return;
+  const key=((IX.meta&&IX.meta.at)||'')+'|'+IX.d.ref+'|'+Object.keys(S.farm.cows).length;
+  if(S.autoKey===key)return;S.autoKey=key;
+  const mv=autoGroupMoves();if(!mv.length)return;
+  S.autoBusy=true;
+  try{
+    const at=nowISO(),patches=[],moves=[];
+    mv.forEach(({c,to,why},i)=>{patches.push({k:c.kolczyk,f:{grupa:to,grupaOd:at,updatedAt:at}});
+      moves.push({id:at.replace(/\D/g,'')+i+'-'+c.kolczyk,kolczyk:c.kolczyk,nr:c.nr??null,z:gOf(c),na:to,at,powod:why})});
+    if(await commit({patches,moves})){applyPatches(patches);S.farm.moves.unshift(...moves.slice().reverse());
+      toast(`Automatycznie przeniesiono ${mv.length} ${mv.length===1?'krowę':mv.length<5?'krowy':'krów'} (szczegóły w Dziś)`);render()}
+  }finally{S.autoBusy=false}
+}
+function autoMovesCard(){
+  const lim=addDays(todayISO(),-3);
+  const l=(S.farm.moves||[]).filter(m=>(m.powod||'').startsWith('auto:')&&(m.at||'').slice(0,10)>=lim).filter(m=>{const c=S.farm.cows[m.kolczyk];return c&&gOf(c)===m.na});
+  if(!l.length)return'';
+  return`<div class="card"><h2 style="margin-top:0">Przeniesione automatycznie (${l.length})</h2>
+    <p class="muted">Na podstawie Infodexu: zasuszenie → Zasuszone, wycielenie → Grupa 1, pobieranie paszy ze stacji 2 dni z rzędu → Grupa 1. Jeśli coś się nie zgadza, cofnij.</p>
+    ${(()=>{const it=m=>{const c=S.farm.cows[m.kolczyk];return`<div class="aitem">${nrLink(lac(c).id||'')}<div class="ar"><div class="rs">${chip(m.z)} → ${chip(m.na)} · ${esc(m.powod.replace(/^auto:\s*/,''))}</div></div><button class="btn sm" data-undo="${esc(m.kolczyk)}|${esc(m.z)}">Cofnij</button></div>`};
+      return`<div class="alist">${l.slice(0,6).map(it).join('')}</div>${l.length>6?`<details><summary>Pokaż pozostałe (${l.length-6})</summary><div class="alist">${l.slice(6).map(it).join('')}</div></details>`:''}`})()}</div>`;
+}
 /* ================== START ================== */
 async function boot(){
   $('#modeBadge').textContent=LOCAL?'Tryb lokalny':'Online';
@@ -573,7 +617,7 @@ $('#tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tab=b.d
 function render(){
   S.charts.forEach(c=>c.destroy());S.charts=[];
   if(!S.farm)return;
-  LACC.clear();if(ixHas())ixL();
+  LACC.clear();if(ixHas()){IX.d._dry=null;ixL();if(!S.autoBusy)setTimeout(runAutoGroups,0)}
   ({dzis:renderDzis,grupy:renderGrupy,stado:renderStado,zyw:renderZyw,woz:renderWoz,pd:renderStado,ust:renderUst})[S.tab]();
   renderSelBar();
 }
@@ -1389,10 +1433,16 @@ function ixBuild(){
   // dzienne podsumowanie stada
   D.herdDay={};
   for(const dt of D.dates){
-    const c=IX.days[dt].c||{};let tot=0,n=0,un=0;
-    for(const id in c){const m=c[id].m;if(!m)continue;if(id==='0'){un+=m;continue}tot+=m;n++}
-    D.herdDay[dt]={tot:tot+un,cows:n,avg:n?tot/n:null,un};
+    const c=IX.days[dt].c||{};let tot=0,n=0,un=0,both=0;
+    for(const id in c){const m=c[id].m;if(!m)continue;if(id==='0'){un+=m;continue}tot+=m;n++;if(c[id].m1>0&&c[id].m2>0)both++}
+    D.herdDay[dt]={tot:tot+un,cows:n,avg:n?tot/n:null,un,both};
   }
+  // ochrona przed niepełnym dniem (np. brak porannego udoju w danych): weź poprzedni pełny dzień
+  D.skip=null;
+  {const R0=D.ref,h0=D.herdDay[R0];const pv=dRange(addDays(R0,-7),addDays(R0,-1)).map(d=>D.herdDay[d]).filter(x=>x&&x.cows>0);
+   if(h0&&pv.length>=4){const mt=med(pv.map(x=>x.tot)),mb=med(pv.map(x=>x.both||0));
+    if((mb>=10&&(h0.both||0)<mb*0.6)||h0.tot<mt*0.8){const p=[...D.dates].reverse().find(d=>d<R0&&D.herdDay[d]&&D.herdDay[d].cows>0);
+      if(p){D.skip={d:R0,tot:h0.tot,mt,both:h0.both||0,mb};D.ref=p}}}}
 }
 const ixCows=()=>(IX.herd&&IX.herd.cows)||{};
 const ixRec=(id,dt)=>IX.d&&IX.d.ser[id]&&IX.d.ser[id][dt]||null;
@@ -1513,6 +1563,35 @@ function curveAt(cls,dimv){
 const lactCls=l=>l===1?'p':'w';
 
 /* ================== ALERTY, RUJE, KALENDARZ ================== */
+/* krowy zasuszone albo w drodze do zasuszenia (≤7 dni do planowanego zasuszenia) – poza alarmami mleka i porównaniami */
+function dryingIds(){
+  if(IX.d._dry&&IX.d._dryAt===S.farm.settings.dniZasuszenia+'|'+Object.keys(S.farm.cows).length)return IX.d._dry;
+  const set=new Set(),T=todayISO(),dz=S.farm.settings.dniZasuszenia;
+  for(const c of activeCows()){const L=lac(c);if(!L.id)continue;
+    if(L.zas||gOf(c)==='zas'){set.add(L.id);continue}
+    const pw=planWyc(c);if(pw&&dayDiff(T,pw)-dz<=7)set.add(L.id)}
+  for(const id in ixCows())if(ixCows()[id].state===3)set.add(id);
+  IX.d._dry=set;IX.d._dryAt=dz+'|'+Object.keys(S.farm.cows).length;return set;
+}
+/* porównanie mleka na tych samych krowach (ostatni dzień a ich średnia z 7 poprzednich dni) */
+function herdCompare(){
+  const D=IX.d,R=D.ref,prev=dRange(addDays(R,-7),addDays(R,-1)),dry=dryingIds();
+  const same=[],gone=[],fresh=[],drying=[];
+  for(const id in D.ser){if(id==='0')continue;const ser=D.ser[id],r=ser[R],mR=r&&r.m>0?r.m:null;
+    const pm=prev.map(d=>ser[d]&&ser[d].m).filter(x=>x>0),pa=pm.length>=3?avg(pm):null;
+    if(mR!=null&&pa!=null){(dry.has(id)?drying:same).push({id,mR,pa})}
+    else if(mR==null&&pa!=null)gone.push({id,pa,dry:dry.has(id)});
+    else if(mR!=null&&pa==null)fresh.push({id,mR});
+  }
+  const sR=same.reduce((a,x)=>a+x.mR,0),sP=same.reduce((a,x)=>a+x.pa,0);
+  return{same,gone,fresh,drying,dPer:same.length?(sR-sP)/same.length:null,dPct:sP>0?Math.round((sR/sP-1)*1000)/10:null};
+}
+function groupTile(g,cmp){
+  ixL();const D=IX.d,R=D.ref,ids=new Set(activeCows().filter(c=>gOf(c)===g).map(c=>lac(c).id).filter(Boolean));
+  const l=[];for(const id of ids){const r=(D.ser[id]||{})[R];if(r&&r.m>0)l.push({id,m:r.m})}
+  const sm=cmp.same.filter(x=>ids.has(x.id)),d=sm.length?avg(sm.map(x=>x.mR-x.pa)):null;
+  return`<div class="tile gtile-${g}"><span class="muted">${GR[g].n} – średnio</span><b>${l.length?fNum(avg(l.map(x=>x.m)),1)+' kg':'–'}</b><span class="sub">${l.length} dojonych${d!=null?` · te same krowy ${d>=0?'<span class="up">▲ +':'<span class="down">▼ '}${fNum(d,1)} kg</span> vs 7 dni`:''}</span></div>`;
+}
 function ixAlerts(){
   const s=S.farm.settings,D=IX.d,R=D.ref;if(!R)return{list:[],heats:[],un:0};
   const prev=dRange(addDays(R,-7),addDays(R,-1));
@@ -1520,6 +1599,7 @@ function ixAlerts(){
   const ids=new Set([...Object.keys(herd)]);
   for(const id of ids){
     const h=herd[id];if(h.state===3||h.grp===5)continue;
+    if(dryingIds().has(id))continue;
     const ser=D.ser[id]||{},r=ser[R]||null;
     const reasons=[];let sev=0;
     const pm=prev.map(d=>ser[d]&&ser[d].m).filter(x=>x>0);
@@ -1725,7 +1805,8 @@ function freshBar(){
   const D=IX.d,at=(IX.meta&&IX.meta.at)||'',atD=at.slice(0,10);
   const age=atD?dayDiff(atD,todayISO()):null;
   const old=age!=null&&age>=2;
-  return `<div class="fresh${old?' old':''}"><span>Dane z Infodexu: pełne dni do <b>${fDate(D.ref)}</b>${at?` · ostatnia wysyłka z obory <b>${fD2(atD)} ${esc(at.slice(11,16))}</b>`:''}</span><span class="spacer"></span>
+  const sk=D.skip?`<div class="fresh old" style="margin-top:-6px"><span><b>Dzień ${fD2(D.skip.d)} wygląda na niepełny</b> (mleko stada ${fNum(D.skip.tot,0)} kg, zwykle ok. ${fNum(D.skip.mt,0)} kg${D.skip.mb>=10?`; oba udoje zapisane u ${D.skip.both} krów, zwykle ${Math.round(D.skip.mb)}`:''}). Pokazuję dane z ${fD2(D.ref)}. Sprawdź w Infodexie, czy wszystkie udoje z tego dnia są zapisane.</span></div>`:'';
+  return sk+`<div class="fresh${old?' old':''}"><span>Dane z Infodexu: pełne dni do <b>${fDate(D.ref)}</b>${at?` · ostatnia wysyłka z obory <b>${fD2(atD)} ${esc(at.slice(11,16))}</b>`:''}</span><span class="spacer"></span>
     ${old?`<span class="muted">Agent z obory nie wysłał danych od ${age} dni. Sprawdź, czy komputer w oborze jest włączony i ma internet. Awaryjnie wczytaj plik.</span>${ixFileInput('ixFile','Wczytaj plik',false)}`:''}</div><div id="ixProg" class="muted"></div>`;
 }
 function hiddenKey(){return 'grformela.ok.'+IX.d.ref}
@@ -1738,7 +1819,7 @@ function renderDzis(){
   const prev=dRange(addDays(R,-7),addDays(R,-1)).map(d=>D.herdDay[d]).filter(x=>x&&x.tot>0);
   const t7=avg(prev.map(x=>x.tot)),a7=avg(prev.map(x=>x.avg));
   const dTot=pct(hd.tot,t7),dAvg=hd.avg!=null&&a7!=null?hd.avg-a7:null;
-  const A=ixAlerts(),C=ixCalendar(),hid=getHidden();
+  const A=ixAlerts(),C=ixCalendar(),hid=getHidden(),HC=herdCompare();
   const shown=A.list.filter(a=>!hid.has(a.id)),nHid=A.list.length-shown.length;
   const arrow=v=>v==null?'':v>0?`<span class="up">▲ ${v>0?'+':''}${v}%</span>`:v<0?`<span class="down">▼ ${v}%</span>`:'<span>= 0%</span>';
   const grpOf=id=>{const k=IXL.ix2app[id],c=k&&S.farm.cows[k];return c&&gOf(c)!=='brak'?chip(gOf(c)):''};
@@ -1749,11 +1830,13 @@ function renderDzis(){
   const wr=stWrong(),H=ixHeats();
   $('#main').innerHTML=`${freshBar()}
   ${heatCard(H)}
+  ${autoMovesCard()}
   ${notEatCard()}
   ${wr.length?`<div class="card stwarn"><div class="row"><span class="stb bad">S!</span><div><b>Sprawdź przypisanie do grupy (${wr.length}):</b> pobierają paszę ze stacji, a w aplikacji nie są w Grupie 1.<div class="ids" style="margin-top:6px">${wr.map(c=>nrLink(lac(c).id)).join('')}</div></div><span class="spacer"></span><button class="btn sm" onclick="goTab('grupy')">Popraw w Grupach</button></div></div>`:''}
   <div class="tiles">
-    <div class="tile"><span class="muted">Mleko stada ${fD2(R)}</span><b>${fNum(hd.tot,0)} kg</b><span class="sub">${arrow(dTot)} względem średniej z 7 dni (${fNum(t7,0)} kg)</span></div>
-    <div class="tile"><span class="muted">Średnio na krowę</span><b>${fNum(hd.avg)} kg</b><span class="sub">${dAvg==null?'':(dAvg>=0?'+':'')+fNum(dAvg)+' kg'} · dojonych ${hd.cows||0}</span></div>
+    <div class="tile"><span class="muted">Mleko stada ${fD2(R)}</span><b>${fNum(hd.tot,0)} kg</b><span class="sub">${HC.dPct!=null?`te same krowy (${HC.same.length}): ${HC.dPct>0?`<span class="up">▲ +${fNum(HC.dPct,1)}%</span>`:HC.dPct<0?`<span class="down">▼ ${fNum(HC.dPct,1)}%</span>`:'= 0%'} vs ich 7 dni`:''}${HC.gone.length?`<br>ubyło ${HC.gone.length} (−${fNum(HC.gone.reduce((a,x)=>a+x.pa,0),0)} kg${HC.gone.filter(x=>x.dry).length?`, w tym zasuszone ${HC.gone.filter(x=>x.dry).length}`:''})`:''}${HC.fresh.length?` · świeże ${HC.fresh.length} (+${fNum(HC.fresh.reduce((a,x)=>a+x.mR,0),0)} kg)`:''}${HC.drying.length?` · przed zasuszeniem ${HC.drying.length}`:''}</span></div>
+    <div class="tile"><span class="muted">Średnio na krowę</span><b>${fNum(hd.avg)} kg</b><span class="sub">${HC.dPer!=null?`te same krowy ${HC.dPer>=0?'+':''}${fNum(HC.dPer,1)} kg`:''} · dojonych ${hd.cows||0}</span></div>
+    ${groupTile('g1',HC)}${groupTile('g2',HC)}
     <div class="tile ${shown.length?'warnt':''}"><span class="muted">Do sprawdzenia</span><b>${shown.length}</b><span class="sub">krów z alertem</span></div>
     <div class="tile" id="wxTile"><span class="muted">Upał (THI) – prognoza</span><b>…</b><span class="sub">ładuję pogodę</span></div>
   </div>
@@ -1777,6 +1860,10 @@ function renderDzis(){
 `;
   bindIxFile();
   document.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>{const h=getHidden();h.add(b.dataset.ok);setHidden(h);renderDzis()});
+  document.querySelectorAll('[data-ne]').forEach(b=>b.onclick=()=>{const[k,to]=b.dataset.ne.split('|'),c=S.farm.cows[k];if(!c)return;
+    if(to==='stay'){neSnooze(k,7);toast(`Krowa ${c.nr??''}: nie pytam przez 7 dni`);render();return}
+    moveCows([c],to,'nie je ze stacji – przeniesiona')});
+  document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=()=>{const[k,to]=b.dataset.undo.split('|'),c=S.farm.cows[k];if(c)moveCows([c],to,'cofnięto automatyczne przeniesienie')});
   const sh=$('#showHid');if(sh)sh.onclick=()=>{setHidden(new Set());renderDzis()};
   // wykres 30 dni
   const days=dRange(addDays(R,-29),R).filter(d=>D.herdDay[d]);
@@ -1938,6 +2025,9 @@ function feedLine(id){
   if(F.ft===0)return`<div class="muted">Stacja w Infodexie: <b class="bad">brak żywienia</b> – stacja nic tej krowie nie wyda${st}</div>`;
   return`<div class="muted">Stacja w Infodexie: żywienie ${esc(F.ftTxt||'?')}${F.kg!=null?`, dziś <b>${fNum(F.kg,1)} kg</b>`:''}${F.desc?` (${esc(F.desc)})`:''}${F.pre!=null?` · przed laktacją ${fNum(F.pre,1)} kg`:''}${st}</div>`;
 }
+const NE_KEY='grformela.neSnooze';
+function neSnoozed(k){try{const o=JSON.parse(localStorage.getItem(NE_KEY)||'{}');return o[k]&&o[k]>=todayISO()}catch(e){return false}}
+function neSnooze(k,days){try{const o=JSON.parse(localStorage.getItem(NE_KEY)||'{}');o[k]=addDays(todayISO(),days);localStorage.setItem(NE_KEY,JSON.stringify(o))}catch(e){}}
 /* krowy z dawką w Infodexie, które wczoraj zjadły mniej niż połowę (alarm w Dziś; w Infodexie ten alarm jest wyłączony) */
 function ixNotEating(){
   const P=ixFeedPlan();if(!P||!P.ok)return[];
@@ -1945,6 +2035,7 @@ function ixNotEating(){
   // tylko Grupa 1 – pozostałe grupy nie mają dostępu do stacji
   for(const c of activeCows()){if(gOf(c)!=='g1')continue;const L=lac(c),id=L.id;if(!id||L.zas)continue;
     const h=ixCows()[id]||{};if(h.feedType===0)continue;
+    if(neSnoozed(c.kolczyk)||dryingIds().has(id))continue;
     const ser=D.ser[id]||{},r0=ser[R]||{};if(!(r0.m>0))continue;
     const dose=planKg(P,id,L,ixMilk7(id));if(!(dose>=0.5))continue;
     const ok=d=>{const r=ser[d]||{};return !(r.m>0)||(r.f||0)/1000>=dose*0.5};
@@ -1957,9 +2048,10 @@ function ixNotEating(){
 }
 function notEatCard(){
   const l=ixNotEating();if(!l.length)return'';
-  return`<div class="card stwarn"><h2 style="margin-top:0">Nie zjadają paszy ze stacji (${l.length})</h2>
-    <p class="muted">Grupa 1: wczoraj nic nie zjadły albo od co najmniej 2 dni zjadają mniej niż połowę dawki ustawionej w Infodexie, choć są dojone. Sprawdź zdrowie, responder i dostęp do stacji. (W Infodexie ten alarm jest wyłączony.)</p>
-    <div class="alist">${l.map(x=>`<div class="aitem s${x.n>=3?3:2}">${nrLink(x.id)}<div class="ar"><div class="rs">wczoraj ${fNum(x.f,1)} z ${fNum(x.dose,1)} kg · ${x.n>1?`<b>od ${x.n} dni</b>`:'pierwszy dzień'}</div></div><div>${x.g!=='brak'?chip(x.g):''}</div></div>`).join('')}</div></div>`;
+  return`<div class="card stwarn"><h2 style="margin-top:0">Grupa 1: nie jedzą paszy ze stacji (${l.length})</h2>
+    <p class="muted">Wczoraj nic nie zjadły albo od co najmniej 2 dni zjadają mniej niż połowę dawki z Infodexu, choć są dojone. <b>Czy któraś została przeprowadzona do Grupy 2 albo zasuszona?</b> Jeśli nie – sprawdź zdrowie, responder i dostęp do stacji.</p>
+    <div class="alist">${l.map(x=>`<div class="aitem s${x.n>=3?3:2}">${nrLink(x.id)}<div class="ar"><div class="rs">wczoraj ${fNum(x.f,1)} z ${fNum(x.dose,1)} kg · ${x.n>1?`<b>od ${x.n} dni</b>`:'pierwszy dzień'}</div></div>
+      <div class="nebtn"><button class="btn sm" data-ne="${esc(x.c.kolczyk)}|g2">do G2</button><button class="btn sm" data-ne="${esc(x.c.kolczyk)}|zas">zasuszona</button><button class="btn sm" data-ne="${esc(x.c.kolczyk)}|stay" title="Nie pytaj o tę krowę przez 7 dni">zostaje w G1</button></div></div>`).join('')}</div></div>`;
 }
 /* dawka w Infodexie a zasada (TMR + kg paszy na kg mleka) – lista do przestawienia */
 function doseVsRule(){
