@@ -1,18 +1,37 @@
 rules_version = '2';
+// GR Formela – kto ma dostęp do danych.
+// Adresów e-mail NIE wpisujemy tutaj (repozytorium może być publiczne). Dodaje je właściciel w konsoli Firebase:
+//   • osoby:  Firestore → kolekcja „dostep”, dokument o ID = adres e-mail Google (małymi literami)
+//   • agent z obory:  Firestore → kolekcja „agenci”, dokument o ID = UID konta agenta (Authentication → Użytkownicy)
+// Kolekcji „dostep” i „agenci” nie da się czytać ani zmieniać z aplikacji – tylko w konsoli.
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Wpisz adresy e-mail kont Google, które mają dostęp do danych.
-    function dozwolony() {
+
+    // Osoba zalogowana kontem Google, z potwierdzonym adresem, dodana do kolekcji „dostep”.
+    function osoba() {
       return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
         && request.auth.token.email_verified == true
-        && request.auth.token.email in [
-          'TWOJ.EMAIL@gmail.com'
-        ];
+        && exists(/databases/$(database)/documents/dostep/$(request.auth.token.email));
     }
+
+    // Agent z komputera w oborze (konto e-mail/hasło), dodany po UID do kolekcji „agenci”.
+    function agent() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/agenci/$(request.auth.uid));
+    }
+
     match /farms/{farmId} {
-      allow read, write: if dozwolony();
-      match /{kolekcja}/{doc} {
-        allow read, write: if dozwolony();
+      allow read, write: if osoba();
+      match /{document=**} {
+        allow read, write: if osoba();
+      }
+      // agent może tylko wysyłać dane z Infodexu – nie czyta i nie zmienia niczego innego
+      match /ix/{doc} {
+        allow write: if agent();
+      }
+      match /ix_days/{doc} {
+        allow write: if agent();
       }
     }
   }

@@ -1,3 +1,11 @@
 .firebase/
 node_modules/
 *.log
+# dane z obory i konto agenta – nigdy do repozytorium
+agent/*.json
+agent/*.log
+agent/*.log.old
+agent/*.state
+agent/*.xml
+agent/dryrun/
+agent/run_hidden.vbs

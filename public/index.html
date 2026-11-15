@@ -12,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
 :root{
   --c-pri:#2F6B3A;--c-pri-d:#1E4A27;--c-pri-l:#E8F0E9;--c-bg:#F6F7F2;--c-card:#fff;
@@ -272,6 +273,78 @@ details summary{cursor:pointer}
 #installBar .ib-t{flex:1 1 220px}
 #installBar .ib-t b{display:block;font-size:15px}
 #installBar .btn{padding:8px 14px}
+
+/* logowanie */
+.auth{max-width:440px;margin:8vh auto;text-align:center;padding:28px 22px}
+.auth img{width:72px;height:72px;border-radius:16px}
+.auth h2{font-size:24px;margin:12px 0 6px}
+.auth p{font-size:16px;line-height:1.5;margin:8px 0}
+.gbtn{display:inline-flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:56px;margin:18px 0 8px;font-size:18px;font-weight:700;background:#fff;border:2px solid var(--c-pri);color:var(--c-pri);border-radius:12px}
+.gbtn:hover{background:var(--c-pri-l)}
+.gbtn svg{width:24px;height:24px}
+.auth .err{background:var(--c-red-bg);color:var(--c-red);border-radius:8px;padding:10px 12px;font-size:15px;text-align:left;margin-top:10px}
+.ubtn{width:32px;height:32px;border-radius:50%;border:0;background:#4E7355;color:#fff;font-weight:700;font-size:15px}
+
+/* zwijane sekcje (Dziś, Stado) */
+details.fold{background:var(--c-card);border:1px solid var(--c-brd);border-radius:12px;margin-bottom:12px;overflow:hidden}
+details.fold>summary{list-style:none;display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:"";flex:0 0 12px;width:12px;height:12px;border-right:3px solid var(--c-txt2);border-bottom:3px solid var(--c-txt2);transform:rotate(45deg);margin:0 4px 4px 0;transition:transform .15s}
+details.fold[open]>summary::after{transform:rotate(-135deg);margin:4px 4px 0 0}
+details.fold[open]>summary{border-bottom:1px solid var(--c-brd)}
+.f-ic{flex:0 0 36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;background:var(--c-grey-bg)}
+.f-t{flex:1;min-width:0}
+.f-t b{display:block;font-size:17px;line-height:1.25}
+.f-t span{display:block;font-size:14px;color:var(--c-txt2);line-height:1.35;margin-top:2px}
+.f-n{flex:0 0 auto;min-width:30px;height:30px;padding:0 9px;border-radius:15px;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;background:var(--c-grey-bg);color:var(--c-txt)}
+.f-n.r{background:var(--c-red);color:#fff}.f-n.a{background:var(--c-gold);color:#fff}.f-n.g{background:var(--c-pri);color:#fff}
+.fold.t-r .f-ic{background:var(--c-red-bg)}.fold.t-a .f-ic{background:var(--c-gold-bg)}.fold.t-g .f-ic{background:var(--c-pri-l)}
+.f-b{padding:12px 14px 14px}
+.f-b>.muted:first-child{margin-top:0}
+.f-b .tiles{margin-bottom:12px}
+.f-b .card{border:0;padding:0;margin:0}
+
+/* informacja do zamknięcia (automatyczne przeniesienia) */
+.note{display:flex;align-items:flex-start;gap:12px;background:var(--c-blue-bg);border:1px solid #BCCBDB;border-radius:12px;padding:12px 12px 12px 14px;margin-bottom:12px}
+.note .n-ic{font-size:22px;line-height:1.2}
+.note .n-t{flex:1;min-width:0;font-size:16px;line-height:1.4}
+.note .n-t .muted{font-size:14px;margin-top:2px}
+.note .n-x{flex:0 0 44px;height:44px;border:0;background:transparent;font-size:26px;line-height:1;color:var(--c-txt2);border-radius:10px;margin:-6px -4px 0 0}
+.note .n-x:active{background:rgba(0,0,0,.06)}
+.note .n-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.note .n-acts .btn{min-height:44px;padding:8px 16px;font-size:15px}
+.mvl{margin-top:10px;border-top:1px solid #BCCBDB}
+.mvl>div{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #D5E0EA;flex-wrap:wrap}
+.mvl .mv-t{flex:1 1 160px;font-size:14px}
+
+/* lista z kolorową kropką (świeże krowy) */
+.sl>div{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:10px 0;border-bottom:1px solid #EDF1ED;align-items:start}
+.sl>div:last-child{border-bottom:0}
+.sl .ixc{font-size:18px;min-width:48px;text-align:center}
+.sl .s-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--c-txt2)}
+.dot{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:14px;color:var(--c-txt);white-space:nowrap}
+.dot::before{content:"";width:12px;height:12px;border-radius:50%;background:var(--c-pri)}
+.dot.a::before{background:var(--c-gold)}.dot.r::before{background:var(--c-red)}
+.sl ul{margin:4px 0 0;padding-left:18px;font-size:15px}
+.sl li{margin:2px 0}
+.sl li.r{color:var(--c-red)}.sl li.a{color:#8a6100}
+
+/* rozród: wskaźniki */
+.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin:4px 0 14px}
+.kbox{border:1px solid var(--c-brd);border-left:6px solid var(--c-grey);border-radius:8px;padding:10px 12px;background:#fff}
+.kbox.g{border-left-color:var(--c-pri)}.kbox.a{border-left-color:var(--c-gold)}.kbox.r{border-left-color:var(--c-red)}
+.kbox .k-l{font-size:14px;color:var(--c-txt2);line-height:1.3}
+.kbox b{display:block;font-size:26px;line-height:1.2;margin:2px 0}
+.kbox .k-c{font-size:13px;color:var(--c-txt2)}
+.bull{display:grid;grid-template-columns:minmax(80px,1.2fr) 2fr auto;gap:8px 10px;align-items:center;font-size:15px;padding:6px 0;border-bottom:1px solid #EDF1ED}
+.bull .bar{height:12px;background:var(--c-grey-bg);border-radius:6px;overflow:hidden}
+.bull .bar i{display:block;height:100%;background:var(--c-pri);border-radius:6px}
+.bull .bar i.a{background:var(--c-gold)}.bull .bar i.r{background:var(--c-red)}
+@media(max-width:860px){
+  .note .n-t,.f-t b{font-size:16px}
+  .kgrid{grid-template-columns:1fr 1fr}
+  .kbox b{font-size:22px}
+}
 </style>
 </head>
 <body>
@@ -303,8 +376,10 @@ const firebaseConfig={
   messagingSenderId:"845150973868",
   appId:"1:845150973868:web:c43eccf71dcf2a23bc5409"
 };
+// Na Firebase Hosting (…web.app / …firebaseapp.com) logowanie idzie przez ten sam adres – działa też w Safari i w zainstalowanej aplikacji
+if(/\.(web\.app|firebaseapp\.com)$/.test(location.hostname))firebaseConfig.authDomain=location.hostname;
 const LOCAL=!firebaseConfig.apiKey||firebaseConfig.apiKey.startsWith('WKLEJ');
-const APP_VER='0.12.0';
+const APP_VER='0.13.0';
 const FARM={id:'formela',name:'Formela Adam'};
 
 /* ===== PARSER PLIKU SOL ===== */
@@ -589,28 +664,74 @@ async function runAutoGroups(){
       toast([mv.length?`Automatycznie przeniesiono ${mv.length} ${mv.length===1?'krowę':mv.length<5?'krowy':'krów'} (szczegóły w Dziś)`:'',nrFix.length?`Numery z Infodexu: ${nrFix.length}`:''].filter(Boolean).join(' · '));render()}
   }finally{S.autoBusy=false}
 }
-function autoMovesCard(){
-  const lim=addDays(todayISO(),-3);
-  const l=(S.farm.moves||[]).filter(m=>(m.powod||'').startsWith('auto:')&&(m.at||'').slice(0,10)>=lim).filter(m=>{const c=S.farm.cows[m.kolczyk];return c&&gOf(c)===m.na});
-  if(!l.length)return'';
-  return`<div class="card"><h2 style="margin-top:0">Przeniesione automatycznie (${l.length})</h2>
-    <p class="muted">Na podstawie Infodexu: zasuszenie → Zasuszone, wycielenie → Grupa 1, pobieranie paszy ze stacji 2 dni z rzędu → Grupa 1. Jeśli coś się nie zgadza, cofnij.</p>
-    ${(()=>{const it=m=>{const c=S.farm.cows[m.kolczyk];return`<div class="aitem">${nrLink(lac(c).id||'')}<div class="ar"><div class="rs">${chip(m.z)} → ${chip(m.na)} · ${esc(m.powod.replace(/^auto:\s*/,''))}</div></div><button class="btn sm" data-undo="${esc(m.kolczyk)}|${esc(m.z)}">Cofnij</button></div>`};
-      return`<div class="alist">${l.slice(0,6).map(it).join('')}</div>${l.length>6?`<details><summary>Pokaż pozostałe (${l.length-6})</summary><div class="alist">${l.slice(6).map(it).join('')}</div></details>`:''}`})()}</div>`;
-}
 /* ================== START ================== */
+/* Logowanie kontem Google. Dostęp do danych dają reguły bazy (firestore.rules):
+   tylko adresy e-mail dodane przez właściciela w kolekcji „dostep”. */
+let AUTH=null,ME=null,BOOTED=false;
+const G_ICON='<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.2l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.2 5.6c4.2-3.9 7.1-9.6 7.1-17.1z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.2-5.6c-2 1.4-4.7 2.3-8.7 2.3-6.2 0-11.5-4.1-13.4-9.9l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>';
+function authScreen(err=''){
+  $('#tabs').classList.add('hidden');$('#userBox').innerHTML='';
+  $('#main').innerHTML=`<div class="card auth"><img src="icon-192.png" alt=""><h2>GR Formela</h2>
+    <p>Zaloguj się swoim kontem Google, żeby zobaczyć dane gospodarstwa.</p>
+    <button class="gbtn" id="gIn">${G_ICON}<span>Zaloguj przez Google</span></button>
+    ${err?`<div class="err">${err}</div>`:''}
+    <p class="muted" style="margin-top:14px">Dane są chronione. Widzą je tylko osoby, które właściciel dodał do aplikacji.</p></div>`;
+  $('#gIn').onclick=signIn;
+}
+async function signIn(){
+  const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});
+  try{await AUTH.signInWithPopup(p)}
+  catch(e){
+    // okienko zablokowane (np. zainstalowana aplikacja na iPhonie) – logowanie przez przekierowanie
+    if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment','auth/cancelled-popup-request'].includes(e.code)){try{await AUTH.signInWithRedirect(p);return}catch(e2){e=e2}}
+    if(e.code==='auth/popup-closed-by-user')return;
+    console.error(e);
+    authScreen(e.code==='auth/unauthorized-domain'?`Ten adres strony nie jest jeszcze dopuszczony do logowania (${esc(location.hostname)}). Właściciel musi go dodać w konsoli Firebase: Authentication → Ustawienia → Autoryzowane domeny.`:e.code==='auth/network-request-failed'?'Brak internetu. Sprawdź połączenie i spróbuj ponownie.':`Nie udało się zalogować (${esc(e.code||e.message)}).`);
+  }
+}
+async function signOutAll(){
+  if(!confirm('Wylogować? Dane gospodarstwa zostaną usunięte z tego urządzenia (w bazie zostają).'))return;
+  try{await AUTH.signOut()}catch(e){}
+  // czyszczenie kopii danych na urządzeniu: baza offline, dane z Infodexu, kopia lokalna
+  try{if(db){await db.terminate();await db.clearPersistence()}}catch(e){console.warn(e)}
+  try{if(IXDB._db)IXDB._db.close();indexedDB.deleteDatabase('grformela-ix-'+FARM.id)}catch(e){}
+  try{Object.keys(localStorage).filter(k=>k.startsWith('grformela.')&&k!=='grformela.ui').forEach(k=>localStorage.removeItem(k))}catch(e){}
+  location.reload();
+}
+function userChip(){
+  if(!ME){$('#userBox').innerHTML='';return}
+  const n=(ME.displayName||ME.email||'?').trim();
+  $('#userBox').innerHTML=`<button class="ubtn" title="${esc(ME.email||'')} – konto i wylogowanie" onclick="goTab('ust')">${esc(n[0].toUpperCase())}</button>`;
+}
+function noAccessScreen(){
+  $('#tabs').classList.add('hidden');
+  $('#main').innerHTML=`<div class="card auth"><img src="icon-192.png" alt=""><h2>Brak dostępu</h2>
+    <p>Konto <b>${esc(ME&&ME.email||'')}</b> nie ma dostępu do danych tego gospodarstwa.</p>
+    <p class="muted">Poproś właściciela aplikacji, żeby dodał ten adres e-mail. Jeśli masz inne konto Google – wyloguj się i zaloguj tamtym.</p>
+    <button class="gbtn" id="gOut"><span>Wyloguj / zmień konto</span></button></div>`;
+  $('#gOut').onclick=async()=>{try{await AUTH.signOut()}catch(e){}location.reload()};
+}
 async function boot(){
   $('#modeBadge').textContent=LOCAL?'Tryb lokalny':'Online';
   $('#modeBadge').className='mode'+(LOCAL?' local':'');
   if(LOCAL){await afterLogin();return}
   firebase.initializeApp(firebaseConfig);
+  AUTH=firebase.auth();
   db=firebase.firestore();
   try{await db.enablePersistence({synchronizeTabs:true})}catch(e){}
-  $('#tabs').classList.remove('hidden');
-  try{await afterLogin()}catch(e){
-    console.error(e);
-    $('#main').innerHTML=`<div class="card login"><h2>Brak połączenia z bazą</h2><p class="muted">Sprawdź internet oraz reguły Firestore (plik firestore.rules). Szczegóły: ${esc(e.code||e.message)}</p><button class="btn pri" onclick="location.reload()">Spróbuj ponownie</button></div>`;
-  }
+  $('#main').innerHTML='<div class="card muted">Sprawdzam logowanie…</div>';
+  try{await AUTH.getRedirectResult()}catch(e){if(e.code!=='auth/no-auth-event')console.warn(e)}
+  AUTH.onAuthStateChanged(async u=>{
+    if(!u){ME=null;if(BOOTED)location.reload();else authScreen();return}
+    if(BOOTED&&ME&&ME.uid===u.uid)return;
+    ME=u;BOOTED=true;userChip();
+    $('#tabs').classList.remove('hidden');
+    try{await afterLogin()}catch(e){
+      console.error(e);
+      if(e.code==='permission-denied'){noAccessScreen();return}
+      $('#main').innerHTML=`<div class="card auth"><h2>Brak połączenia z bazą</h2><p>Sprawdź internet i spróbuj ponownie.</p><p class="muted">Szczegóły: ${esc(e.code||e.message)}</p><button class="gbtn" onclick="location.reload()"><span>Spróbuj ponownie</span></button></div>`;
+    }
+  });
 }
 async function afterLogin(){
   S.farmId=FARM.id;
@@ -1033,8 +1154,8 @@ function stadoAvgRows(rows){
 function renderStado(){
   const dates=Object.keys(S.farm.tests).sort().reverse();
   if(!S.pdDate||!S.farm.tests[S.pdDate])S.pdDate=dates[0]||null;
-  $('#main').innerHTML=`${pdUploadCard()}<div class="card"><h2 style="margin-top:0">Stado</h2><div id="stadoBox"></div></div>${pdAnalysisCard(dates)}`;
-  renderStadoBox();bindPD(dates);
+  $('#main').innerHTML=`${reproFold()}${pdUploadCard()}<div class="card"><h2 style="margin-top:0">Stado</h2><div id="stadoBox"></div></div>${pdAnalysisCard(dates)}`;
+  renderStadoBox();bindPD(dates);bindFolds();
 }
 function renderStadoBox(){
   const s=S.farm.settings,rows=stadoRows(),box=$('#stadoBox');
@@ -1395,7 +1516,8 @@ function renderAnalysis(){
 function renderUst(){
   const s=S.farm.settings;
   const num=(k,label,step=1)=>`<label class="f">${label}<input type="number" step="${step}" data-s="${k}" value="${s[k]??''}"></label>`;
-  $('#main').innerHTML=`
+  $('#main').innerHTML=`${ME?`<div class="card"><div class="row"><div><h2 style="margin:0">Konto</h2><div class="muted" style="font-size:15px">Zalogowano: <b>${esc(ME.email||'')}</b></div></div><span class="spacer"></span><button class="btn" id="btnOut" style="min-height:44px">Wyloguj</button></div>
+    <p class="muted" style="margin:8px 0 0">Wylogowanie usuwa dane gospodarstwa z tego urządzenia. W bazie nic nie znika.</p></div>`:''}
   <div class="card"><h2>Reguły grup</h2><p class="muted">Na ich podstawie aplikacja podpowiada przesunięcia. Przesunięcie zawsze zatwierdzasz sam.</p>
     <div class="grid2">${num('dimG1G2','Grupa 1 → 2: od dnia laktacji')}${num('dimG1G2Pierw','Próg dla pierwiastek (puste = jak wyżej)')}
     ${num('dniZasuszenia','Zasuszenie: dni przed wycieleniem')}${num('ciaza','Długość ciąży (dni)')}</div>${ixPar('DryOffBeforeCalving')?`<p class="muted" style="margin-top:8px">W Infodexie: zasuszenie ${esc(ixPar('DryOffBeforeCalving'))} dni przed wycieleniem, ciąża ${esc(ixPar('CalvingAfterInsemination')||'–')} dni, siara ${esc(ixPar('Colstrum')||'–')} dni. Aplikacja liczy według wartości wpisanych powyżej.</p>`:''}</div>
@@ -1422,6 +1544,7 @@ function renderUst(){
     ${ixHas()?(()=>{const iss=ixL().issues;return iss.length?`<details style="margin-top:12px"><summary><b>Dopasowanie krów Infodex ↔ próbny dój: ${iss.length} uwag</b></summary><p class="muted">Krowy łączę po kolczyku, a gdy się nie zgadza, po numerze. Popraw kolczyki w Infodexie albo w SOL, żeby dane się nie myliły.</p><div class="hist">${iss.map(i=>`<div>${esc(i.msg)}</div>`).join('')}</div></details>`:'<p class="muted" style="margin-top:12px">Wszystkie krowy z Infodexu dopasowane do próbnego doju.</p>'})():''}</div>`;
   ixShowStatus();
   $('#ixFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)ixImport(f)};
+  {const bo=$('#btnOut');if(bo)bo.onclick=signOutAll}
   $('#saveSet').onclick=async()=>{
     const ns={...s};document.querySelectorAll('[data-s]').forEach(i=>{const v=i.value.trim();ns[i.dataset.s]=v===''?null:Number(v)});
     Object.keys(DEF_SETTINGS).filter(k=>k!=='dimG1G2Pierw').forEach(k=>{if(ns[k]===null||ns[k]===undefined||isNaN(ns[k]))ns[k]=DEF_SETTINGS[k]});
@@ -1926,42 +2049,126 @@ function freshBar(){
 function hiddenKey(){return 'grformela.ok.'+IX.d.ref}
 function getHidden(){try{return new Set(JSON.parse(localStorage.getItem(hiddenKey())||'[]'))}catch(e){return new Set()}}
 function setHidden(set){try{localStorage.setItem(hiddenKey(),JSON.stringify([...set]))}catch(e){}}
+/* ===== zwijane sekcje: wybór zapamiętany na tym urządzeniu do następnego dnia danych ===== */
+const UI_KEY='grformela.ui';
+function uiGet(){try{return JSON.parse(localStorage.getItem(UI_KEY)||'{}')||{}}catch(e){return{}}}
+function uiSet(k,v){try{const o=uiGet();o[k]=v;localStorage.setItem(UI_KEY,JSON.stringify(o))}catch(e){}}
+const foldRef=()=>(IX.d&&IX.d.ref)||todayISO();
+function fold(id,{ic,title,sub='',n=null,tone='',open=false,body}){
+  const st=uiGet()['f.'+id];
+  const isOpen=st&&st.r===foldRef()?st.o:open;
+  return `<details class="fold${tone?' t-'+tone:''}" data-fold="${id}"${isOpen?' open':''}><summary><span class="f-ic" aria-hidden="true">${ic}</span><span class="f-t"><b>${title}</b>${sub?`<span>${sub}</span>`:''}</span>${n!=null?`<span class="f-n ${tone}">${n}</span>`:''}</summary><div class="f-b">${body}</div></details>`;
+}
+function bindFolds(onOpen={}){
+  document.querySelectorAll('details.fold[data-fold]').forEach(d=>{
+    const id=d.dataset.fold,f=onOpen[id];let done=false;
+    const draw=()=>{if(d.open&&f&&!done){done=true;f()}};
+    d.querySelector('summary').addEventListener('click',()=>setTimeout(()=>{uiSet('f.'+id,{o:d.open,r:foldRef()});draw()},0));
+    draw();
+  });
+}
+
+/* ===== automatyczne przeniesienia: informacja, którą można zamknąć ===== */
+function autoMovesList(){
+  const lim=addDays(todayISO(),-3),seen=new Set(uiGet().mvSeen||[]);
+  return(S.farm.moves||[]).filter(m=>(m.powod||'').startsWith('auto:')&&(m.at||'').slice(0,10)>=lim&&!seen.has(m.id))
+    .filter(m=>{const c=S.farm.cows[m.kolczyk];return c&&gOf(c)===m.na});
+}
+function autoMovesNote(){
+  const l=autoMovesList();if(!l.length)return'';
+  const open=!!S.mvOpen;
+  return`<div class="note" id="mvNote"><span class="n-ic" aria-hidden="true">🔄</span><div class="n-t">
+    <b>Program sam przeniósł ${l.length} ${plN(l.length,'krowę','krowy','krów')} do innej grupy</b>
+    <div class="muted">Według Infodexu: zasuszenie, wycielenie albo pasza ze stacji. Jeśli coś się nie zgadza – otwórz listę i cofnij.</div>
+    ${open?`<div class="mvl">${l.map(m=>{const c=S.farm.cows[m.kolczyk];return`<div>${nrLink(lac(c).id||c.nr||'')}<span class="mv-t">${chip(m.z)} → ${chip(m.na)} ${esc(m.powod.replace(/^auto:\s*/,''))}</span><button class="btn sm" data-undo="${esc(m.kolczyk)}|${esc(m.z)}">Cofnij</button></div>`}).join('')}</div>`:''}
+    <div class="n-acts"><button class="btn pri" data-mvok>OK, rozumiem</button><button class="btn" id="mvShow">${open?'Schowaj listę':'Pokaż które'}</button></div>
+  </div><button class="n-x" data-mvok aria-label="Zamknij informację">×</button></div>`;
+}
+function bindAutoMovesNote(){
+  document.querySelectorAll('[data-mvok]').forEach(b=>b.onclick=()=>{
+    const ids=autoMovesList().map(m=>m.id);const o=uiGet();uiSet('mvSeen',[...(o.mvSeen||[]),...ids].slice(-400));S.mvOpen=false;
+    const n=$('#mvNote');if(n)n.remove()});
+  const sh=$('#mvShow');if(sh)sh.onclick=()=>{S.mvOpen=!S.mvOpen;render()};
+}
+
+/* ===== ŚWIEŻE KROWY: pierwsze 21 dni po wycieleniu ===== */
+/* Przeżuwanie i ruch porównuję z tą samą krową w dniach 3–12 przed wycieleniem (wartości z obroży są względne),
+   mleko ze średnią krzywą stada (pierwiastki / wieloródki) w tym samym dniu laktacji. */
+function ixFresh(){
+  const D=IX.d,R=D.ref,herd=ixCows(),out=[];
+  for(const id in herd){
+    const h=herd[id];if(h.state===3)continue;
+    const x=ixLacId(id);if(!x||!x.cd)continue;
+    const d=dayDiff(x.cd,R);if(d<0||d>21)continue;
+    const ser=D.ser[id]||{},pre=dRange(addDays(x.cd,-12),addDays(x.cd,-3)),l2=[R,addDays(R,-1)].filter(q=>q>=x.cd);
+    const rumPre=med(pre.map(q=>perDay(ser[q],'rum','nr')).filter(v=>v!=null)),stPre=med(pre.map(q=>perDay(ser[q],'st','ns')).filter(v=>v!=null));
+    const rumNow=avg(l2.map(q=>perDay(ser[q],'rum','nr'))),stNow=avg(l2.map(q=>perDay(ser[q],'st','ns')));
+    const mNow=avg(l2.map(q=>ser[q]&&ser[q].m>0&&!oneMilkAt(ser,q)?ser[q].m:null));
+    const segs=ixLact(id),lk=(segs.length?segs[segs.length-1].lakt:null)||h.calv||null,cls=lactCls(lk);
+    const R_=[],A_=[],G_=[];
+    if(d>=2&&!(ser[R]&&ser[R].m>0))R_.push('wczoraj brak zapisu mleka – nie wydojona albo nie rozpoznana w hali');
+    if(rumPre&&rumNow!=null){
+      const ch=rumNow/rumPre-1,t=`przeżuwa ${Math.round(Math.abs(ch)*100)}% ${ch<0?'mniej':'więcej'} niż przed wycieleniem`;
+      if(ch<=(d<=3?-0.45:-0.30))R_.push(t);else if(ch<=(d<=3?-0.30:-0.15))A_.push(t);else G_.push(ch<0?t:'przeżuwa tak jak przed wycieleniem');
+    }else if(!rumPre)G_.push('brak danych z obroży sprzed wycielenia');
+    if(d>=5&&mNow!=null){const e=curveAt(cls,d);if(e){const ch=mNow/e-1,t=`mleko ${fNum(mNow,1)} kg – ${ch<0?`o ${Math.round(-ch*100)}% mniej`:'tyle samo albo więcej'} niż średnio w stadzie w ${d}. dniu (${fNum(e,1)} kg)`;
+      if(ch<=-0.30)R_.push(t);else if(ch<=-0.15)A_.push(t);else G_.push(`mleko ${fNum(mNow,1)} kg – w normie stada`)}}
+    else if(mNow!=null)G_.push(`mleko ${fNum(mNow,1)} kg`);
+    if(d>=4){const l3=[0,1,2].map(i=>ser[addDays(R,-i)]&&ser[addDays(R,-i)].m).filter(v=>v>0),p3=[3,4,5].map(i=>ser[addDays(R,-i)]&&ser[addDays(R,-i)].m).filter(v=>v>0);
+      if(l3.length>=2&&p3.length>=2&&avg(l3)<avg(p3)*0.95&&avg(p3)-avg(l3)>=1.5)A_.push(`mleko spada zamiast rosnąć: ${fNum(avg(p3),1)} → ${fNum(avg(l3),1)} kg`)}
+    if(d>=3&&stPre&&stNow!=null&&stNow/stPre-1<=-0.4)A_.push(`mało się rusza: ${Math.round((1-stNow/stPre)*100)}% mniej kroków niż przed wycieleniem (kulawizna? osłabienie?)`);
+    const lvl=R_.length?2:A_.length?1:0;
+    out.push({id,d,lvl,lk,list:[...R_.map(t=>({c:'r',t})),...A_.map(t=>({c:'a',t})),...(lvl?[]:G_.map(t=>({c:'',t})))]});
+  }
+  return out.sort((a,b)=>b.lvl-a.lvl||a.d-b.d);
+}
+function freshFold(){
+  const F=ixFresh();if(!F.length)return'';
+  const nr=F.filter(x=>x.lvl===2).length,na=F.filter(x=>x.lvl===1).length;
+  const LV=[['g','w porządku'],['a','obserwuj'],['r','sprawdź']];
+  const sub=[nr?`${nr} do sprawdzenia`:'',na?`${na} do obserwacji`:'',!nr&&!na?'wszystkie w porządku':''].filter(Boolean).join(' · ');
+  return fold('swieze',{ic:'🐮',title:`Świeże krowy (${F.length})`,sub:`do 21 dni po wycieleniu · ${sub}`,n:nr||na||null,tone:nr?'r':na?'a':'g',open:nr+na>0,
+    body:`<p class="muted">Przeżuwanie i ruch porównuję z tą samą krową <b>przed wycieleniem</b>, mleko ze średnią świeżych krów w stadzie. W pierwszych 3 dniach mniejsze przeżuwanie jest normalne.</p>
+    <div class="sl">${F.map(x=>`<div>${nrLink(x.id)}<div><div class="s-h"><span class="dot ${LV[x.lvl][0]}">${LV[x.lvl][1]}</span><span>${x.d}. dzień po wycieleniu${x.lk?` · ${x.lk===1?'pierwiastka':`${x.lk}. laktacja`}`:''}</span></div>
+      <ul>${x.list.map(r=>`<li class="${r.c}">${esc(r.t)}</li>`).join('')}</ul></div></div>`).join('')}</div>`});
+}
+
 function renderDzis(){
   if(!ixHas()){$('#main').innerHTML=ixNoData();bindIxFile();return}
   ixL();
   const D=IX.d,R=D.ref,s=S.farm.settings,hd=D.herdDay[R]||{};
-  const prev=dRange(addDays(R,-7),addDays(R,-1)).map(d=>D.herdDay[d]).filter(x=>x&&x.tot>0);
-  const t7=avg(prev.map(x=>x.tot)),a7=avg(prev.map(x=>x.avg));
-  const dTot=pct(hd.tot,t7),dAvg=hd.avg!=null&&a7!=null?hd.avg-a7:null;
   const A=ixAlerts(),C=ixCalendar(),hid=getHidden(),HC=herdCompare();
   const shown=A.list.filter(a=>!hid.has(a.id)),nHid=A.list.length-shown.length;
-  const arrow=v=>v==null?'':v>0?`<span class="up">▲ ${v>0?'+':''}${v}%</span>`:v<0?`<span class="down">▼ ${v}%</span>`:'<span>= 0%</span>';
   const grpOf=id=>{const k=IXL.ix2app[id],c=k&&S.farm.cows[k];return c&&gOf(c)!=='brak'?chip(gOf(c)):''};
   const T=todayISO();
   const dayName=d=>d===T?'Dziś':d===addDays(T,1)?'Jutro':`${wday(d)} ${fD2(d)}`;
   const byDay={};C.items.forEach(x=>{(byDay[x.d]=byDay[x.d]||[]).push(x)});
   const ptNow=C.ptDue.filter(x=>x.days<=60),ptOld=C.ptDue.filter(x=>x.days>60);
-  const wr=stWrong(),H=ixHeats();
+  const wr=stWrong(),H=ixHeats(),NE=ixNotEating();
+  const nW=C.items.filter(x=>x.t==='wyc').length,nZ=C.items.filter(x=>x.t==='zas').length,nToday=(byDay[T]||[]).length;
+  const dP=HC.dPct;
   $('#main').innerHTML=`${freshBar()}
   ${heatCard(H)}
-  ${autoMovesCard()}
-  ${notEatCard()}
-  ${wr.length?`<div class="card stwarn"><div class="row"><span class="stb bad">S!</span><div><b>Sprawdź przypisanie do grupy (${wr.length}):</b> pobierają paszę ze stacji, a w aplikacji nie są w Grupie 1.<div class="ids" style="margin-top:6px">${wr.map(c=>nrLink(lac(c).id)).join('')}</div><div class="muted" style="margin-top:4px">${wr.map(c=>`${esc(c.nr??'?')}: ${esc(moveTxt(c)||'bez zapisanego przeniesienia')}`).join(' · ')}</div></div><span class="spacer"></span><button class="btn sm" onclick="goTab('grupy')">Popraw w Grupach</button></div></div>`:''}
-  <div class="tiles">
+  ${autoMovesNote()}
+  ${fold('alerty',{ic:'🔍',title:'Krowy do sprawdzenia',sub:shown.length?'mleko, przeżuwanie albo ruch inne niż zwykle u tej krowy':'wszystkie krowy w normie',n:shown.length||null,tone:shown.length?'r':'g',open:shown.length>0,
+    body:`<p class="muted">Każdą krowę porównuję z <b>jej własną normą</b> z poprzednich 7 dni. Dotknij numer, żeby otworzyć kartę krowy. „Sprawdzone” chowa krowę do jutra.</p>
+    ${shown.length?`<div class="alist">${shown.map(a=>`<div class="aitem s${Math.min(a.sev,4)}">${nrLink(a.id)}<div class="ar">${a.reasons.map(r=>`<div class="rs ${r.c}">${esc(r.t)}</div>`).join('')}<div class="muted">${grpOf(a.id)} ${a.dim!=null?`dzień laktacji ${a.dim}`:''}</div></div><button class="btn sm" data-ok="${esc(a.id)}">Sprawdzone</button></div>`).join('')}</div>`:'<p>Wszystkie krowy w normie. 👍</p>'}
+    ${nHid?`<button class="btn sm" id="showHid" style="margin-top:10px">Pokaż sprawdzone (${nHid})</button>`:''}`})}
+  ${freshFold()}
+  ${NE.length?fold('niejedza',{ic:'🌾',title:'Grupa 1: nie jedzą ze stacji',sub:'zjadają mniej niż połowę dawki, choć są dojone',n:NE.length,tone:'a',open:true,body:notEatCard().replace(/^<div class="card stwarn"><h2[^>]*>.*?<\/h2>/,'<div>')}):''}
+  ${wr.length?fold('stacja',{ic:'⚠️',title:'Sprawdź przypisanie do grupy',sub:'pobierają paszę ze stacji, a nie są w Grupie 1',n:wr.length,tone:'a',open:true,
+    body:`<div class="ids">${wr.map(c=>nrLink(lac(c).id)).join('')}</div><div class="muted" style="margin-top:6px">${wr.map(c=>`${esc(c.nr??'?')}: ${esc(moveTxt(c)||'bez zapisanego przeniesienia')}`).join(' · ')}</div><button class="btn" style="margin-top:10px;min-height:44px" onclick="goTab('grupy')">Popraw w Grupach</button>`}):''}
+  ${fold('mleko',{ic:'🥛',title:`Mleko stada ${fD2(R)}: ${fNum(hd.tot,0)} kg`,sub:`średnio ${fNum(hd.avg)} kg na krowę${dP!=null?` · ${dP>0?'▲ +':dP<0?'▼ ':''}${fNum(dP,1)}% wobec 7 dni`:''}`,open:false,
+    body:`<div class="tiles">
     <div class="tile"><span class="muted">Mleko stada ${fD2(R)}</span><b>${fNum(hd.tot,0)} kg</b><span class="sub">${HC.dPct!=null?`te same krowy (${HC.same.length}): ${HC.dPct>0?`<span class="up">▲ +${fNum(HC.dPct,1)}%</span>`:HC.dPct<0?`<span class="down">▼ ${fNum(HC.dPct,1)}%</span>`:'= 0%'} vs ich 7 dni`:''}${HC.gone.length?`<br>ubyło ${HC.gone.length} (−${fNum(HC.gone.reduce((a,x)=>a+x.pa,0),0)} kg${HC.gone.filter(x=>x.dry).length?`, w tym zasuszone ${HC.gone.filter(x=>x.dry).length}`:''})`:''}${HC.fresh.length?` · świeże ${HC.fresh.length} (+${fNum(HC.fresh.reduce((a,x)=>a+x.mR,0),0)} kg)`:''}${HC.drying.length?` · przed zasuszeniem ${HC.drying.length}`:''}</span></div>
     <div class="tile"><span class="muted">Średnio na krowę</span><b>${fNum(hd.avg)} kg</b><span class="sub">${HC.dPer!=null?`te same krowy ${HC.dPer>=0?'+':''}${fNum(HC.dPer,1)} kg`:''} · dojonych ${hd.cows||0}</span></div>
     ${groupTile('g1',HC)}${groupTile('g2',HC)}
-    <div class="tile ${shown.length?'warnt':''}"><span class="muted">Do sprawdzenia</span><b>${shown.length}</b><span class="sub">krów z alertem</span></div>
     <div class="tile" id="wxTile"><span class="muted">Upał (THI) – prognoza</span><b>…</b><span class="sub">ładuję pogodę</span></div>
-  </div>
-  <div class="card"><div class="row"><h3 style="margin:0">Mleko stada – 30 dni</h3><span class="spacer"></span><span class="muted">kliknij punkt, żeby zobaczyć wartość</span></div><div class="chart-box sm"><canvas id="chHerd"></canvas></div>
-    ${A.un>20?`<p class="muted" style="margin:6px 0 0">W tym mleko z krów nierozpoznanych w hali: <b>${fNum(A.un,0)} kg</b>. Jeśli to się powtarza, sprawdź respondery.</p>`:''}</div>
-  <div class="card"><div class="row"><h2 style="margin:0">Krowy do sprawdzenia</h2><span class="spacer"></span>${nHid?`<button class="btn sm" id="showHid">Pokaż sprawdzone (${nHid})</button>`:''}</div>
-    <p class="muted">Porównanie z <b>własną normą krowy</b> z poprzednich 7 dni. Kliknij numer, żeby otworzyć kartę krowy.</p>
-    ${shown.length?`<div class="alist">${shown.map(a=>`<div class="aitem s${Math.min(a.sev,4)}">${nrLink(a.id)}<div class="ar">${a.reasons.map(r=>`<div class="rs ${r.c}">${esc(r.t)}</div>`).join('')}<div class="muted">${grpOf(a.id)} ${a.dim!=null?`dzień laktacji ${a.dim}`:''}</div></div><button class="btn sm" data-ok="${esc(a.id)}" title="Ukryj do następnego dnia danych">Sprawdzone</button></div>`).join('')}</div>`:'<p>Wszystkie krowy w normie. 👍</p>'}
-  </div>
-  <div class="card"><h2>Kalendarz – 14 dni</h2>
-      ${C.late.length?`<div class="late"><b>Zasuszenie zaległe (${C.late.length})</b><div class="muted">Cielne, do wycielenia mniej niż ${s.dniZasuszenia} dni, a wciąż dojone. Liczba przy numerze to dni opóźnienia.</div><div class="ids" style="margin-top:6px">${C.late.map(x=>nrLink(x.id,` <small>${dayDiff(x.d,T)} d.</small>`)).join('')}</div></div>`:''}
+    </div>
+    <h3 style="margin:4px 0 6px">Ostatnie 30 dni</h3><div class="chart-box sm"><canvas id="chHerd"></canvas></div>
+    ${A.un>20?`<p class="muted" style="margin:6px 0 0">W tym mleko z krów nierozpoznanych w hali: <b>${fNum(A.un,0)} kg</b>. Jeśli to się powtarza, sprawdź respondery.</p>`:''}`})}
+  ${fold('kal',{ic:'📅',title:'Kalendarz – 14 dni',sub:[nToday?`dziś: ${nToday}`:'',nW?`wycielenia: ${nW}`:'',nZ+C.late.length?`zasuszenia: ${nZ+C.late.length}`:'',ptNow.length?`do badania: ${ptNow.length}`:'',C.ready.length?`do krycia: ${C.ready.length}`:''].filter(Boolean).join(' · ')||'nic zaplanowanego',n:C.late.length||null,tone:C.late.length?'a':'',open:false,
+    body:`${C.late.length?`<div class="late"><b>Zasuszenie zaległe (${C.late.length})</b><div class="muted">Cielne, do wycielenia mniej niż ${s.dniZasuszenia} dni, a wciąż dojone. Liczba przy numerze to dni opóźnienia.</div><div class="ids" style="margin-top:6px">${C.late.map(x=>nrLink(x.id,` <small>${dayDiff(x.d,T)} d.</small>`)).join('')}</div></div>`:''}
       ${Object.keys(byDay).length?Object.entries(byDay).map(([d,l])=>`<div class="cal-d${d<T?' past':''}"><b>${dayName(d)}</b><div>${l.map(x=>`<div class="cal-i ${x.t}">${nrLink(x.id)} ${esc(x.txt)}</div>`).join('')}</div></div>`).join(''):'<p class="muted">Nic zaplanowanego na najbliższe 14 dni.</p>'}
       <h3 style="margin-top:14px">Do badania ciąży (${ptNow.length})</h3>
       <p class="muted" style="margin-top:-6px">${s.badanieCiazyOd}–60 dni po inseminacji, bez wyniku badania.</p>
@@ -1969,23 +2176,25 @@ function renderDzis(){
       ${ptOld.length?`<details style="margin-top:8px"><summary>Inseminowane ponad 60 dni temu, ciąża niepotwierdzona w Infodexie (${ptOld.length})</summary><p class="muted">Albo badania nie są wpisywane do Infodexu, albo te krowy wymagają sprawdzenia.</p><div class="ids">${ptOld.map(x=>nrLink(x.id,` <small>${x.days} d.</small>`)).join('')}</div></details>`:''}
       <h3 style="margin-top:14px">Gotowe do krycia: ${s.vwp}+ dni po wycieleniu, bez inseminacji (${C.ready.length})</h3>
       ${C.ready.length?`<div class="ids">${C.ready.map(x=>nrLink(x.id,` <small${x.dim>150?' class="bad"':''}>${x.dim} d.</small>`)).join('')}</div>`:'<p class="muted">Brak.</p>'}
-      <p class="muted" style="margin-top:10px">Wycielenia liczone od ostatniej inseminacji + ${s.ciaza} dni (lub z planowanej daty wpisanej w karcie krowy). Zasuszenie ${s.dniZasuszenia} dni przed.</p>
-    </div>
+      <p class="muted" style="margin-top:10px">Wycielenia liczone od ostatniej inseminacji + ${s.ciaza} dni (lub z planowanej daty wpisanej w karcie krowy). Zasuszenie ${s.dniZasuszenia} dni przed.</p>`})}
 `;
-  bindIxFile();
+  bindIxFile();bindAutoMovesNote();
   document.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>{const h=getHidden();h.add(b.dataset.ok);setHidden(h);renderDzis()});
   document.querySelectorAll('[data-ne]').forEach(b=>b.onclick=()=>{const[k,to]=b.dataset.ne.split('|'),c=S.farm.cows[k];if(!c)return;
     if(to==='stay'){neSnooze(k,7);toast(`Krowa ${c.nr??''}: nie pytam przez 7 dni`);render();return}
     moveCows([c],to,'nie je ze stacji – przeniesiona')});
   document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=()=>{const[k,to]=b.dataset.undo.split('|'),c=S.farm.cows[k];if(c)moveCows([c],to,'cofnięto automatyczne przeniesienie')});
   const sh=$('#showHid');if(sh)sh.onclick=()=>{setHidden(new Set());renderDzis()};
-  // wykres 30 dni
+  bindFolds({mleko:()=>{
+  // wykres 30 dni (rysowany dopiero po rozwinięciu sekcji)
   const days=dRange(addDays(R,-29),R).filter(d=>D.herdDay[d]);
   S.charts.push(new Chart($('#chHerd'),{type:'bar',data:{labels:days.map(fD2),datasets:[
     {type:'line',label:'Średnio na krowę (kg)',data:days.map(d=>D.herdDay[d].avg),borderColor:'#2F6B3A',backgroundColor:'#2F6B3A',yAxisID:'y1',tension:.25,pointRadius:2},
     {label:'Mleko stada (kg)',data:days.map(d=>D.herdDay[d].tot),backgroundColor:'rgba(63,99,133,.25)',yAxisID:'y'}]},
     options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'bottom'}},
       scales:{y:{beginAtZero:false,title:{display:true,text:'kg stada'}},y1:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'kg/krowę'}}}}}));
+  }});
+
   // pogoda
   wxGet().then(W=>{
     const el=$('#wxTile');if(!el)return;
@@ -1995,6 +2204,74 @@ function renderDzis(){
     el.className='tile '+(mx.w.thi>=68?'warnt':'');
     el.innerHTML=`<span class="muted">Upał (THI) – prognoza</span><b class="thi-${thiCls(mx.w.thi)}">${fNum(mx.w.thi,0)}</b><span class="sub">${mx.w.thi>=68?`stres cieplny ${dayName(mx.d).toLowerCase()} (${fNum(mx.w.t,0)}°C)`:'bez stresu cieplnego w 4 dni'} · ${nx.map(x=>`${dayName(x.d)} ${fNum(x.w.thi,0)}`).join(', ')}</span>`;
   }).catch(e=>{const el=$('#wxTile');if(el){el.querySelector('b').textContent='–';el.querySelector('.sub').textContent='brak połączenia z serwisem pogody'}});
+}
+
+/* ================== ROZRÓD STADA: wyniki z Infodexu (ostatnie 12 miesięcy) ================== */
+/* Ciąża po inseminacji = dodatni wynik badania przed kolejną inseminacją albo wycielenie 260–300 dni później.
+   Brak ciąży = kolejna inseminacja albo ujemny wynik badania. Inseminacje w odstępie ≤ 2 dni to jedna ruja. */
+function ixReproStats(){
+  const s=S.farm.settings,T=todayISO(),from=addDays(T,-365),D=IX.d,herd=ixCows();
+  // numer w Infodexie użyty ponownie dla innej krowy – starsze zdarzenia należą do poprzedniego zwierzęcia
+  const cut={};(IX.herdlog||[]).forEach(x=>{if(x.t==='ear'){const c=x.d0?addDays(x.d0,1):x.d;if(!cut[x.id]||c>cut[x.id])cut[x.id]=c}});
+  const svc=[],ci=[],dff=[],dop=[],problem=[];
+  for(const id in D.ev){
+    const ev=D.ev[id].filter(e=>!cut[id]||e.d.slice(0,10)>=cut[id]);
+    const calv=[];ev.filter(e=>e.t===5).map(e=>e.d.slice(0,10)).sort().forEach(d=>{if(!calv.length||dayDiff(calv[calv.length-1],d)>30)calv.push(d)});
+    const pts=ev.filter(e=>e.t===3&&e.r!=null).map(e=>({d:e.d.slice(0,10),pos:e.r===s.kodCiazy}));
+    const ins=[];ev.filter(e=>e.t===2).forEach(e=>{const d=e.d.slice(0,10),l=ins[ins.length-1];if(l&&dayDiff(l.d,d)<=2)return;ins.push({d,b:(e.b||'').trim()})});
+    ins.forEach((x,k)=>{
+      const nx=ins[k+1]?ins[k+1].d:null,cd=[...calv].reverse().find(c=>c<=x.d)||null;
+      if(nx&&cd&&calv.some(c=>c>cd&&c<=nx))return; // dane niespójne – pomijam
+      const okC=calv.some(c=>{const g=dayDiff(x.d,c);return g>=260&&g<=300});
+      const inWin=pts.filter(p=>p.d>x.d&&(!nx||p.d<nx));
+      const ok=okC||inWin.some(p=>p.pos);
+      const res=ok?1:(nx||inWin.some(p=>!p.pos))?0:null;
+      const first=!!cd&&!ins.slice(0,k).some(y=>y.d>cd);
+      svc.push({id,d:x.d,b:x.b,res,first,cd});
+    });
+    // odstęp między wycieleniami
+    for(let i=1;i<calv.length;i++){const g=dayDiff(calv[i-1],calv[i]);if(calv[i]>=from&&g>=300&&g<=800)ci.push(g)}
+    // od wycielenia do 1. inseminacji i do zacielenia
+    calv.forEach((cd,i)=>{const nc=calv[i+1]||'9999';
+      const l=svc.filter(v=>v.id===id&&v.d>cd&&v.d<nc);
+      if(l.length&&l[0].d>=from){const g=dayDiff(cd,l[0].d);if(g>=20&&g<=250)dff.push(g)}
+      const ok=l.find(v=>v.res===1);if(ok&&ok.d>=from){const g=dayDiff(cd,ok.d);if(g>=20&&g<=400)dop.push(g)}});
+    // krowy problemowe: obecna laktacja, 3+ inseminacje, bez ciąży
+    const h=herd[id];if(h&&h.state!==2&&h.state!==3){const lc=calv[calv.length-1]||'';const cur=svc.filter(v=>v.id===id&&v.d>lc);
+      if(cur.length>=3&&!cur.some(v=>v.res===1))problem.push({id,n:cur.length,last:cur[cur.length-1].d})}
+  }
+  const win=svc.filter(v=>v.d>=from),done=win.filter(v=>v.res!=null),okN=done.filter(v=>v.res===1).length;
+  const f=done.filter(v=>v.first),fOk=f.filter(v=>v.res===1).length;
+  const bulls={};done.forEach(v=>{const b=v.b||'(bez nazwy)';(bulls[b]=bulls[b]||{b,n:0,ok:0}).n++;if(v.res===1)bulls[b].ok++});
+  return{
+    ci:{v:avg(ci),n:ci.length},dff:{v:avg(dff),n:dff.length},dop:{v:avg(dop),n:dop.length},
+    spc:{v:okN?done.length/okN:null,n:done.length},fsr:{v:f.length?fOk/f.length*100:null,n:f.length},
+    bulls:Object.values(bulls).sort((a,b)=>b.n-a.n),problem:problem.sort((a,b)=>b.n-a.n),
+    pending:win.filter(v=>v.res==null).length,total:win.length
+  };
+}
+function reproFold(){
+  if(!ixHas())return'';
+  const P=ixReproStats();if(!P.total&&!P.ci.n)return'';
+  const lvl=(v,g,a,lowGood=true)=>v==null?'':lowGood?(v<=g?'g':v<=a?'a':'r'):(v>=g?'g':v>=a?'a':'r');
+  const K=[
+    {l:'Odstęp między wycieleniami',x:P.ci,u:' dni',d:0,c:lvl(P.ci.v,400,420),cel:'cel: do 400 dni'},
+    {l:'Od wycielenia do 1. inseminacji',x:P.dff,u:' dni',d:0,c:lvl(P.dff.v,80,100),cel:'cel: 60–80 dni'},
+    {l:'Od wycielenia do zacielenia',x:P.dop,u:' dni',d:0,c:lvl(P.dop.v,115,140),cel:'cel: do 115 dni'},
+    {l:'Inseminacji na jedną ciążę',x:P.spc,u:'',d:1,c:lvl(P.spc.v,2.0,2.5),cel:'cel: do 2,0'},
+    {l:'Skuteczne pierwsze inseminacje',x:P.fsr,u:'%',d:0,c:lvl(P.fsr.v,40,30,false),cel:'cel: co najmniej 40%'}];
+  K.forEach(k=>{if(k.x.n<5){k.c='';k.cel+=' · za mało danych'}});
+  const good=K.filter(k=>k.c==='g').length,bad=K.filter(k=>k.c==='r').length,known=K.filter(k=>k.c).length;
+  const bc=p=>p>=40?'':p>=30?'a':'r';
+  return fold('rozrod',{ic:'❤️',title:'Rozród stada – wyniki',sub:known?`${good} z ${known} wyników w normie${P.problem.length?` · ${P.problem.length} ${plN(P.problem.length,'krowa','krowy','krów')} z 3+ inseminacjami`:''}`:'za mało danych z Infodexu',
+    n:bad||null,tone:bad?'r':known&&good===known?'g':'a',open:false,
+    body:`<p class="muted">Z zapisów w Infodexie za ostatnie 12 miesięcy. Ciąża liczy się, gdy jest dodatnie badanie albo wycielenie ok. 9 miesięcy po inseminacji.</p>
+    <div class="kgrid">${K.map(k=>`<div class="kbox ${k.c}"><div class="k-l">${k.l}</div><b>${k.x.v!=null?fNum(k.x.v,k.d)+k.u:'–'}</b><div class="k-c">${k.cel}</div></div>`).join('')}</div>
+    ${P.bulls.length?`<h3>Skuteczność buhajów</h3><p class="muted" style="margin-top:-6px">Ile inseminacji danym buhajem skończyło się ciążą. Przy mniej niż 10 inseminacjach wynik jest mało pewny.</p>
+      ${P.bulls.map(b=>{const p=b.ok/b.n*100;return`<div class="bull"><span><b>${esc(b.b)}</b></span><span class="bar"><i class="${bc(p)}" style="width:${Math.round(p)}%"></i></span><span><b>${Math.round(p)}%</b> <span class="muted">(${b.ok} z ${b.n}${b.n<10?', mało danych':''})</span></span></div>`}).join('')}`:''}
+    ${P.problem.length?`<h3 style="margin-top:14px">Krowy z 3 i więcej inseminacjami bez ciąży (${P.problem.length})</h3><p class="muted" style="margin-top:-6px">Warto pokazać lekarzowi weterynarii. Liczba przy numerze to inseminacje w tej laktacji.</p>
+      <div class="ids">${P.problem.map(x=>nrLink(x.id,` <small>${x.n}×</small>`)).join('')}</div>`:''}
+    ${P.pending?`<p class="muted" style="margin-top:12px">Czeka na wynik (badanie albo kolejna ruja): ${P.pending} ${plN(P.pending,'inseminacja','inseminacje','inseminacji')}.</p>`:''}`});
 }
 
 /* ================== KARTA KROWY: CZĘŚĆ INFODEX ================== */
