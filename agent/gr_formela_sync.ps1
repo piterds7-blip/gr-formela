@@ -98,7 +98,7 @@ function FV($v) {
 }
 
 # ---------------- logowanie agenta (Firebase Authentication) ----------
-# Baza przyjmuje dane tylko od zalogowanego agenta wpisanego przez wlasciciela do kolekcji "agenci".
+# Baza przyjmuje dane tylko od zalogowanego agenta dodanego w aplikacji (zakladka Dostep, rola: agent).
 $script:tok = $null; $script:tokAt = [datetime]::MinValue
 function Get-IdToken {
   if ($script:tok -and ((Get-Date) - $script:tokAt).TotalMinutes -lt 45) { return $script:tok }
@@ -110,25 +110,33 @@ function Get-IdToken {
   } catch {
     $msg = $_.Exception.Message
     try { $msg = (New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd() } catch {}
-    if ($msg -match 'INVALID_PASSWORD|EMAIL_NOT_FOUND|INVALID_LOGIN_CREDENTIALS|INVALID_EMAIL|USER_DISABLED') { throw 'KONTO: zly e-mail albo haslo konta agenta (albo konto wylaczone). Uruchom USTAW_KONTO.bat.' }
+    if ($msg -match 'INVALID_PASSWORD|EMAIL_NOT_FOUND|INVALID_LOGIN_CREDENTIALS|INVALID_EMAIL|USER_DISABLED') { throw 'KONTO: zle haslo agenta (albo konto usuniete w zakladce Dostep). Uruchom USTAW_KONTO.bat.' }
     throw "Logowanie agenta nie powiodlo sie: $msg"
   }
   $script:tok = $r.idToken; $script:tokAt = Get-Date
   return $script:tok
 }
+# konto agenta = skrot hasla (tak samo jak w aplikacji): wpisuje sie tylko haslo nadane w zakladce "Dostep"
+function PwEmail([string]$pw) {
+  $sha = [Security.Cryptography.SHA256]::Create()
+  $h = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes('grformela|' + $pw))
+  return 'u' + ((($h | ForEach-Object { $_.ToString('x2') }) -join '').Substring(0, 32)) + '@grformela.app'
+}
 function Set-Account {
   Write-Host ''
-  Write-Host ' Konto agenta (zalozone przez wlasciciela w konsoli Firebase, Authentication).'
+  Write-Host ' Wpisz haslo agenta z aplikacji (zakladka Dostep -> Komputer w oborze).'
   Write-Host ' Haslo nie bedzie widoczne podczas wpisywania. Zapisze sie zaszyfrowane na tym komputerze.'
   Write-Host ''
-  $em = (Read-Host ' E-mail konta agenta').Trim()
-  $pw = Read-Host ' Haslo' -AsSecureString
-  if (-not $em -or $pw.Length -eq 0) { Log 'BLAD: nie podano e-maila albo hasla.'; return $false }
+  $pw = Read-Host ' Haslo agenta' -AsSecureString
+  if ($pw.Length -eq 0) { Log 'BLAD: nie podano hasla.'; return $false }
+  $plain = (New-Object System.Management.Automation.PSCredential('x', $pw)).GetNetworkCredential().Password.Trim()
+  $em = PwEmail $plain
   if (-not (Test-Path $acctDir)) { New-Item -ItemType Directory $acctDir | Out-Null }
   $old = $null; if (Test-Path $acctF) { $old = Get-Content $acctF -Raw }
-  (New-Object System.Management.Automation.PSCredential($em, $pw)) | Export-Clixml $acctF
+  (New-Object System.Management.Automation.PSCredential($em, (ConvertTo-SecureString $plain -AsPlainText -Force))) | Export-Clixml $acctF
+  $plain = $null
   $script:tok = $null
-  try { [void](Get-IdToken); Log "Konto agenta zapisane i sprawdzone: $em"; return $true }
+  try { [void](Get-IdToken); Log 'Konto agenta zapisane i sprawdzone.'; return $true }
   catch {
     Log ('BLAD: ' + $_.Exception.Message)
     if ($old) { Set-Content -Path $acctF -Value $old -NoNewline } else { Remove-Item $acctF -Force }
@@ -167,7 +175,7 @@ function Commit($docs, [int]$chunk = 25) {
           $msg = $_.Exception.Message
           if ($msg -like 'KONTO:*') { throw }
           try { $msg += ' | ' + (New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd() } catch {}
-          if ($msg -match 'PERMISSION_DENIED|\(403\)') { throw 'KONTO: baza odrzucila dane agenta (brak uprawnien). Sprawdz, czy UID konta agenta jest w kolekcji "agenci" w Firebase.' }
+          if ($msg -match 'PERMISSION_DENIED|\(403\)') { throw 'KONTO: baza odrzucila dane agenta (brak uprawnien). Sprawdz w aplikacji, zakladka Dostep, czy agent nie jest zablokowany.' }
           if ($msg -match '\(401\)') { $script:tok = $null }
           if ($try -ge 3) { throw "Firebase odrzucil zapis: $msg" }
           Start-Sleep -Seconds (5 * $try)

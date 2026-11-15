@@ -1,30 +1,44 @@
 rules_version = '2';
 // GR Formela – kto ma dostęp do danych.
-// Adresów e-mail NIE wpisujemy tutaj (repozytorium może być publiczne). Dodaje je właściciel w konsoli Firebase:
-//   • osoby:  Firestore → kolekcja „dostep”, dokument o ID = adres e-mail Google (małymi literami)
-//   • agent z obory:  Firestore → kolekcja „agenci”, dokument o ID = UID konta agenta (Authentication → Użytkownicy)
-// Kolekcji „dostep” i „agenci” nie da się czytać ani zmieniać z aplikacji – tylko w konsoli.
+// Każde konto (logowanie hasłem) ma dokument uzytkownicy/{UID}:
+//   rola: 'admin' (twórca) | 'user' (osoba) | 'agent' (komputer w oborze)
+//   aktywny: true/false (blokada), zakladki: [...], zapis: true/false (prawo zmieniania danych)
+// Dokumenty zmienia tylko twórca (zakładka „Dostęp” w aplikacji). Pierwszego twórcę dodaje się raz w konsoli Firebase.
+// Uwaga: zakładki ukrywa aplikacja; baza rozróżnia: brak dostępu / podgląd / zapis / agent.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Osoba zalogowana kontem Google, z potwierdzonym adresem, dodana do kolekcji „dostep”.
-    function osoba() {
-      return request.auth != null
-        && request.auth.token.firebase.sign_in_provider == 'google.com'
-        && request.auth.token.email_verified == true
-        && exists(/databases/$(database)/documents/dostep/$(request.auth.token.email));
+    function profil() {
+      return get(/databases/$(database)/documents/uzytkownicy/$(request.auth.uid)).data;
     }
-
-    // Agent z komputera w oborze (konto e-mail/hasło), dodany po UID do kolekcji „agenci”.
-    function agent() {
+    function aktywne() {
       return request.auth != null
-        && exists(/databases/$(database)/documents/agenci/$(request.auth.uid));
+        && exists(/databases/$(database)/documents/uzytkownicy/$(request.auth.uid))
+        && profil().aktywny == true;
+    }
+    function tworca()  { return aktywne() && profil().rola == 'admin'; }
+    function osoba()   { return aktywne() && profil().rola in ['admin', 'user']; }
+    function zapis()   { return osoba() && (profil().rola == 'admin' || profil().zapis == true); }
+    function agent()   { return aktywne() && profil().rola == 'agent'; }
+
+    // uprawnienia: każdy czyta tylko swój dokument (żeby aplikacja wiedziała, co pokazać); zmienia tylko twórca
+    match /uzytkownicy/{uid} {
+      allow read: if (request.auth != null && request.auth.uid == uid) || tworca();
+      allow create, update: if tworca()
+        && request.resource.data.rola in ['admin', 'user', 'agent']
+        && request.resource.data.aktywny is bool
+        && (uid != request.auth.uid
+            || (request.resource.data.rola == 'admin' && request.resource.data.aktywny == true));
+      // twórca nie może usunąć ani zablokować samego siebie (żeby nie odciąć się od aplikacji)
+      allow delete: if tworca() && uid != request.auth.uid;
     }
 
     match /farms/{farmId} {
-      allow read, write: if osoba();
+      allow read: if osoba();
+      allow write: if zapis();
       match /{document=**} {
-        allow read, write: if osoba();
+        allow read: if osoba();
+        allow write: if zapis();
       }
       // agent może tylko wysyłać dane z Infodexu – nie czyta i nie zmienia niczego innego
       match /ix/{doc} {

@@ -10,7 +10,7 @@ if not exist "%DST%" mkdir "%DST%"
 copy /Y "%~dp0gr_formela_sync.ps1" "%DST%\gr_formela_sync.ps1" >nul
 if errorlevel 1 goto blad_kopia
 if exist "%USERPROFILE%\GRFormela\gr_formela_konto.xml" goto konto_ok
-echo  [0/2] Konto agenta - wpisz e-mail i haslo, ktore dostales od wlasciciela.
+echo  [0/2] Konto agenta - wpisz haslo agenta z aplikacji (zakladka Dostep).
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%DST%\gr_formela_sync.ps1" -SetAccount
 if errorlevel 4 goto brak_konta
 if errorlevel 2 goto brak_netu
@@ -45,8 +45,8 @@ exit /b 1
 :brak_konta
 echo.
 echo  BRAK KONTA AGENTA albo zle haslo - baza nie przyjela danych.
-echo  Uruchom USTAW_KONTO.bat i wpisz e-mail oraz haslo konta agenta
-echo  (zalozone przez wlasciciela w Firebase). Szczegoly w gr_formela_sync.log.
+echo  Uruchom USTAW_KONTO.bat i wpisz haslo agenta z aplikacji
+echo  (zakladka Dostep). Szczegoly w gr_formela_sync.log.
 pause
 exit /b 1
 :brak_netu

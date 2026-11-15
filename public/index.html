@@ -345,6 +345,36 @@ details.fold[open]>summary{border-bottom:1px solid var(--c-brd)}
   .kgrid{grid-template-columns:1fr 1fr}
   .kbox b{font-size:22px}
 }
+
+/* logowanie hasłem i panel dostępu */
+.pwrow{display:flex;gap:8px;margin-top:14px}
+.pwin{flex:1;min-width:0;font-size:20px;padding:12px 14px;border:2px solid var(--c-brd);border-radius:12px;text-align:center}
+.pwin:focus{border-color:var(--c-pri);outline:none}
+.pweye{flex:0 0 56px;border:2px solid var(--c-brd);background:#fff;border-radius:12px;font-size:20px}
+.gbtn.pri{background:var(--c-pri);color:#fff}
+.gbtn.pri:hover{background:var(--c-pri-d)}
+.auth details.first{margin-top:18px;text-align:left;font-size:14px}
+.auth details.first summary{color:var(--c-txt2)}
+code.uid{display:inline-block;background:var(--c-grey-bg);padding:6px 10px;border-radius:6px;font-size:14px;word-break:break-all;user-select:all}
+.pwbig{font-size:26px;font-weight:800;text-align:center;letter-spacing:.5px;background:var(--c-pri-l);border-radius:10px;padding:14px;user-select:all;word-break:break-all}
+.ulist{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-bottom:16px}
+.ucard{background:#fff;border:1px solid var(--c-brd);border-radius:12px;padding:14px}
+.ucard.off{background:#F7F7F5;opacity:.85}
+.u-h{display:flex;align-items:center;gap:12px}
+.u-av{flex:0 0 42px;height:42px;border-radius:50%;background:var(--c-pri-l);color:var(--c-pri);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+.u-n b{display:block;font-size:17px}.u-n span{font-size:14px;color:var(--c-txt2)}
+.u-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.tchip{display:inline-flex}
+.tchip input{position:absolute;opacity:0;pointer-events:none}
+.tchip span{display:inline-flex;align-items:center;min-height:40px;padding:6px 14px;border-radius:20px;border:2px solid var(--c-brd);color:var(--c-txt2);font-weight:600;cursor:pointer;user-select:none}
+.tchip input:checked+span{background:var(--c-pri);border-color:var(--c-pri);color:#fff}
+.tchip input:checked+span::before{content:"✓ "}
+.tchip input:focus-visible+span{outline:3px solid #7FB08A}
+.tsw{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:15px;cursor:pointer}
+.tsw input{width:22px;height:22px;flex:0 0 22px}
+.u-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.u-acts .btn{min-height:44px}
+@media(max-width:860px){.ulist{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -359,6 +389,7 @@ details.fold[open]>summary{border-bottom:1px solid var(--c-brd)}
   <button data-t="zyw">Żywienie</button>
   <button data-t="woz">Wóz</button>
   <button data-t="ust"><span class="lbl-d">Ustawienia</span><span class="lbl-m">Ustaw.</span></button>
+  <button data-t="dostep" class="hidden">Dostęp</button>
 </nav>
 <main id="main"></main>
 <div id="modalRoot"></div>
@@ -535,6 +566,7 @@ const S={sortBy:localStorage.getItem('grformela.sortBy')||'dim_desc',farms:[],fa
   stadoG:'all',stadoSort:{k:'nr',d:1},pdDate:null,pending:null,charts:[]};
 
 async function commit(payload){
+  if(!canWrite()){toast('Masz tylko podgląd – zmiany może zapisać twórca albo osoba z prawem zapisu.',5000);return false}
   try{await Store.commit(S.farmId,payload);return true}
   catch(e){console.error(e);toast('Nie zapisano: '+(e.code==='permission-denied'?'brak uprawnień do bazy.':e.message),6000);return false}
 }
@@ -646,7 +678,7 @@ function autoGroupMoves(){
   return out;
 }
 async function runAutoGroups(){
-  if(S.autoBusy||!ixHas()||!S.farm)return;
+  if(S.autoBusy||!ixHas()||!S.farm||!canWrite())return;
   const key=((IX.meta&&IX.meta.at)||'')+'|'+IX.d.ref+'|'+Object.keys(S.farm.cows).length;
   if(S.autoKey===key)return;S.autoKey=key;
   const mv=autoGroupMoves();
@@ -665,51 +697,95 @@ async function runAutoGroups(){
   }finally{S.autoBusy=false}
 }
 /* ================== START ================== */
-/* Logowanie kontem Google. Dostęp do danych dają reguły bazy (firestore.rules):
-   tylko adresy e-mail dodane przez właściciela w kolekcji „dostep”. */
-let AUTH=null,ME=null,BOOTED=false;
-const G_ICON='<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.2l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.2 5.6c4.2-3.9 7.1-9.6 7.1-17.1z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.2-5.6c-2 1.4-4.7 2.3-8.7 2.3-6.2 0-11.5-4.1-13.4-9.9l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>';
+/* ================== LOGOWANIE HASŁEM I DOSTĘP DO ZAKŁADEK ==================
+   Każda osoba ma własne hasło (nadaje je twórca w zakładce „Dostęp”). Hasło jednocześnie wskazuje konto:
+   adres konta w Firebase = skrót hasła, więc przy logowaniu wpisuje się tylko hasło.
+   Uprawnienia: dokument uzytkownicy/{UID} (rola, zakładki, prawo zapisu, aktywny). Zmieniać je może tylko twórca.
+   Haseł nigdzie nie zapisujemy – telefon pamięta zalogowanie, a przeglądarka może zapamiętać hasło. */
+let AUTH=null,ME=null,PROF=null,BOOTED=false,PROF_UNSUB=null;
+const TABS=[['dzis','Dziś'],['grupy','Grupy'],['stado','Stado'],['zyw','Żywienie'],['woz','Wóz'],['ust','Ustawienia']];
+const isAdmin=()=>!!(PROF&&PROF.rola==='admin');
+function tabOk(t){if(LOCAL||!PROF)return true;if(t==='dostep')return isAdmin();if(isAdmin())return true;return(PROF.zakladki||[]).includes(t)}
+const canWrite=()=>LOCAL||isAdmin()||!!(PROF&&PROF.zapis);
+async function pwEmail(pw){
+  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('grformela|'+pw));
+  return 'u'+[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,32)+'@grformela.app';
+}
 function authScreen(err=''){
   $('#tabs').classList.add('hidden');$('#userBox').innerHTML='';
   $('#main').innerHTML=`<div class="card auth"><img src="icon-192.png" alt=""><h2>GR Formela</h2>
-    <p>Zaloguj się swoim kontem Google, żeby zobaczyć dane gospodarstwa.</p>
-    <button class="gbtn" id="gIn">${G_ICON}<span>Zaloguj przez Google</span></button>
+    <p>Wpisz swoje hasło.</p>
+    <form id="pwForm" autocomplete="on">
+      <input type="text" name="username" value="GR Formela" autocomplete="username" hidden>
+      <div class="pwrow"><input id="pwIn" class="pwin" type="password" name="password" autocomplete="current-password" placeholder="Hasło" required>
+      <button type="button" class="pweye" id="pwEye" aria-label="Pokaż hasło">👁</button></div>
+      <button class="gbtn pri" type="submit" id="pwGo"><span>Wejdź</span></button>
+    </form>
     ${err?`<div class="err">${err}</div>`:''}
-    <p class="muted" style="margin-top:14px">Dane są chronione. Widzą je tylko osoby, które właściciel dodał do aplikacji.</p></div>`;
-  $('#gIn').onclick=signIn;
+    <p class="muted" style="margin-top:14px">Hasło dostajesz od twórcy aplikacji. Na tym urządzeniu wystarczy wpisać je raz.</p>
+    <details class="first"><summary>Pierwsze uruchomienie (tylko twórca)</summary>
+      <p class="muted">Wpisz wyżej nowe, długie hasło twórcy i kliknij poniżej. Aplikacja pokaże kod konta do wpisania w konsoli Firebase.</p>
+      <button class="btn" type="button" id="pwNew">Utwórz konto twórcy z tym hasłem</button></details></div>`;
+  const inp=$('#pwIn');inp.focus();
+  $('#pwEye').onclick=()=>{inp.type=inp.type==='password'?'text':'password'};
+  $('#pwForm').onsubmit=e=>{e.preventDefault();signIn(inp.value)};
+  $('#pwNew').onclick=()=>createOwner(inp.value);
 }
-async function signIn(){
-  const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});
-  try{await AUTH.signInWithPopup(p)}
-  catch(e){
-    // okienko zablokowane (np. zainstalowana aplikacja na iPhonie) – logowanie przez przekierowanie
-    if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment','auth/cancelled-popup-request'].includes(e.code)){try{await AUTH.signInWithRedirect(p);return}catch(e2){e=e2}}
-    if(e.code==='auth/popup-closed-by-user')return;
-    console.error(e);
-    authScreen(e.code==='auth/unauthorized-domain'?`Ten adres strony nie jest jeszcze dopuszczony do logowania (${esc(location.hostname)}). Właściciel musi go dodać w konsoli Firebase: Authentication → Ustawienia → Autoryzowane domeny.`:e.code==='auth/network-request-failed'?'Brak internetu. Sprawdź połączenie i spróbuj ponownie.':`Nie udało się zalogować (${esc(e.code||e.message)}).`);
-  }
+function authErr(e){
+  return({'auth/invalid-credential':'Nieprawidłowe hasło.','auth/invalid-login-credentials':'Nieprawidłowe hasło.','auth/wrong-password':'Nieprawidłowe hasło.','auth/user-not-found':'Nieprawidłowe hasło.',
+    'auth/too-many-requests':'Za dużo prób. Odczekaj kilka minut i spróbuj ponownie.','auth/network-request-failed':'Brak internetu. Sprawdź połączenie i spróbuj ponownie.',
+    'auth/user-disabled':'To konto jest wyłączone.','auth/email-already-in-use':'To hasło jest już zajęte – wybierz inne.','auth/operation-not-allowed':'Logowanie hasłem nie jest włączone w Firebase (Authentication → E-mail/hasło).'})[e.code]||`Nie udało się (${esc(e.code||e.message)}).`;
+}
+async function signIn(pw){
+  pw=(pw||'').trim();if(!pw)return;
+  const b=$('#pwGo');if(b){b.disabled=true;b.querySelector('span').textContent='Sprawdzam…'}
+  try{await AUTH.signInWithEmailAndPassword(await pwEmail(pw),pw)}
+  catch(e){console.warn(e);authScreen(authErr(e))}
+}
+async function createOwner(pw){
+  pw=(pw||'').trim();if(pw.length<10)return authScreen('Hasło twórcy musi mieć co najmniej 10 znaków.');
+  try{await AUTH.createUserWithEmailAndPassword(await pwEmail(pw),pw)}catch(e){authScreen(authErr(e))}
 }
 async function signOutAll(){
-  if(!confirm('Wylogować? Dane gospodarstwa zostaną usunięte z tego urządzenia (w bazie zostają).'))return;
+  if(!confirm('Wylogować? Dane gospodarstwa zostaną usunięte z tego urządzenia (w bazie zostają). Do ponownego wejścia potrzebne będzie hasło.'))return;
+  if(PROF_UNSUB)PROF_UNSUB();
   try{await AUTH.signOut()}catch(e){}
-  // czyszczenie kopii danych na urządzeniu: baza offline, dane z Infodexu, kopia lokalna
   try{if(db){await db.terminate();await db.clearPersistence()}}catch(e){console.warn(e)}
   try{if(IXDB._db)IXDB._db.close();indexedDB.deleteDatabase('grformela-ix-'+FARM.id)}catch(e){}
-  try{Object.keys(localStorage).filter(k=>k.startsWith('grformela.')&&k!=='grformela.ui').forEach(k=>localStorage.removeItem(k))}catch(e){}
+  try{Object.keys(localStorage).filter(k=>k.startsWith('grformela.')).forEach(k=>localStorage.removeItem(k))}catch(e){}
   location.reload();
 }
 function userChip(){
-  if(!ME){$('#userBox').innerHTML='';return}
-  const n=(ME.displayName||ME.email||'?').trim();
-  $('#userBox').innerHTML=`<button class="ubtn" title="${esc(ME.email||'')} – konto i wylogowanie" onclick="goTab('ust')">${esc(n[0].toUpperCase())}</button>`;
+  if(!ME||!PROF){$('#userBox').innerHTML='';return}
+  const n=(PROF.imie||'?').trim();
+  $('#userBox').innerHTML=`<button class="ubtn" id="ubtn" title="Konto: ${esc(n)}">${esc((n[0]||'?').toUpperCase())}</button>`;
+  $('#ubtn').onclick=()=>{openModal(`<h2>Konto</h2><p style="font-size:16px">Zalogowano: <b>${esc(n)}</b>${isAdmin()?' (twórca)':''}</p>
+    <p class="muted">Wylogowanie usuwa dane gospodarstwa z tego urządzenia. Do ponownego wejścia potrzebne jest hasło.</p>
+    <div class="row" style="margin-top:12px"><button class="btn danger" id="mOut" style="min-height:44px">Wyloguj</button><span class="spacer"></span><button class="btn" data-close style="min-height:44px">Zamknij</button></div>`);
+    $('#mOut').onclick=signOutAll};
 }
-function noAccessScreen(){
+function lockScreen(title,html){
   $('#tabs').classList.add('hidden');
-  $('#main').innerHTML=`<div class="card auth"><img src="icon-192.png" alt=""><h2>Brak dostępu</h2>
-    <p>Konto <b>${esc(ME&&ME.email||'')}</b> nie ma dostępu do danych tego gospodarstwa.</p>
-    <p class="muted">Poproś właściciela aplikacji, żeby dodał ten adres e-mail. Jeśli masz inne konto Google – wyloguj się i zaloguj tamtym.</p>
-    <button class="gbtn" id="gOut"><span>Wyloguj / zmień konto</span></button></div>`;
-  $('#gOut').onclick=async()=>{try{await AUTH.signOut()}catch(e){}location.reload()};
+  $('#main').innerHTML=`<div class="card auth"><img src="icon-192.png" alt=""><h2>${title}</h2>${html}
+    <button class="gbtn" id="gOut"><span>Wyloguj / inne hasło</span></button></div>`;
+  $('#gOut').onclick=async()=>{if(PROF_UNSUB)PROF_UNSUB();try{await AUTH.signOut()}catch(e){}location.reload()};
+}
+function applyTabs(){
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('hidden',!tabOk(b.dataset.t)));
+  if(!tabOk(S.tab)){const f=TABS.map(x=>x[0]).concat('dostep').find(tabOk);if(f){S.tab=f;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t===f))}}
+}
+function onProfile(p){
+  const first=!PROF;PROF=p;
+  if(!p){lockScreen('Konto czeka na dostęp',`<p>Hasło jest poprawne, ale twórca nie przyznał jeszcze dostępu.</p>
+    <p class="muted">Kod konta (dla twórcy):</p><p><code class="uid">${esc(ME.uid)}</code></p>
+    <p class="muted">Pierwsze uruchomienie: w konsoli Firebase → Firestore utwórz kolekcję <b>uzytkownicy</b>, dokument o ID = ten kod, z polami <b>rola</b> = admin, <b>aktywny</b> = true, <b>imie</b> = Twoje imię.</p>`);return}
+  if(p.aktywny!==true){lockScreen('Dostęp zablokowany',`<p>Twórca aplikacji zablokował to konto.</p>`);return}
+  if(p.rola==='agent'){lockScreen('Konto agenta',`<p>To hasło jest dla komputera w oborze (USTAW_KONTO.bat), nie do aplikacji.</p>`);return}
+  userChip();$('#tabs').classList.remove('hidden');applyTabs();
+  if(first||!S.farm){afterLogin().catch(e=>{console.error(e);
+    if(e.code==='permission-denied'){lockScreen('Brak dostępu',`<p>Baza nie wpuszcza tego konta. Sprawdź reguły w Firebase.</p>`);return}
+    $('#main').innerHTML=`<div class="card auth"><h2>Brak połączenia z bazą</h2><p>Sprawdź internet i spróbuj ponownie.</p><p class="muted">Szczegóły: ${esc(e.code||e.message)}</p><button class="gbtn" onclick="location.reload()"><span>Spróbuj ponownie</span></button></div>`})}
+  else render();
 }
 async function boot(){
   $('#modeBadge').textContent=LOCAL?'Tryb lokalny':'Online';
@@ -720,17 +796,13 @@ async function boot(){
   db=firebase.firestore();
   try{await db.enablePersistence({synchronizeTabs:true})}catch(e){}
   $('#main').innerHTML='<div class="card muted">Sprawdzam logowanie…</div>';
-  try{await AUTH.getRedirectResult()}catch(e){if(e.code!=='auth/no-auth-event')console.warn(e)}
-  AUTH.onAuthStateChanged(async u=>{
-    if(!u){ME=null;if(BOOTED)location.reload();else authScreen();return}
+  AUTH.onAuthStateChanged(u=>{
+    if(!u){ME=null;PROF=null;if(BOOTED)location.reload();else authScreen();return}
     if(BOOTED&&ME&&ME.uid===u.uid)return;
-    ME=u;BOOTED=true;userChip();
-    $('#tabs').classList.remove('hidden');
-    try{await afterLogin()}catch(e){
-      console.error(e);
-      if(e.code==='permission-denied'){noAccessScreen();return}
-      $('#main').innerHTML=`<div class="card auth"><h2>Brak połączenia z bazą</h2><p>Sprawdź internet i spróbuj ponownie.</p><p class="muted">Szczegóły: ${esc(e.code||e.message)}</p><button class="gbtn" onclick="location.reload()"><span>Spróbuj ponownie</span></button></div>`;
-    }
+    ME=u;BOOTED=true;
+    // uprawnienia na żywo: zablokowanie albo zmiana zakładek działa od razu, bez ponownego logowania
+    PROF_UNSUB=db.collection('uzytkownicy').doc(u.uid).onSnapshot(s=>onProfile(s.exists?s.data():null),
+      e=>{console.error(e);lockScreen('Brak dostępu',`<p>Nie udało się sprawdzić uprawnień (${esc(e.code||e.message)}).</p>`)});
   });
 }
 async function afterLogin(){
@@ -743,13 +815,14 @@ async function afterLogin(){
 }
 
 /* ================== NAWIGACJA ================== */
-$('#tabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tab=b.dataset.t;
+$('#tabs').onclick=e=>{const b=e.target.closest('button');if(!b||!tabOk(b.dataset.t))return;S.tab=b.dataset.t;
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));S.selMode=false;S.sel.clear();render();window.scrollTo(0,0)};
 function render(){
   S.charts.forEach(c=>c.destroy());S.charts=[];
   if(!S.farm)return;
   LACC.clear();if(ixHas()){IX.d._dry=null;ixL();if(!S.autoBusy)setTimeout(runAutoGroups,0)}
-  ({dzis:renderDzis,grupy:renderGrupy,stado:renderStado,zyw:renderZyw,woz:renderWoz,pd:renderStado,ust:renderUst})[S.tab]();
+  if(!tabOk(S.tab))applyTabs();
+  ({dzis:renderDzis,grupy:renderGrupy,stado:renderStado,zyw:renderZyw,woz:renderWoz,pd:renderStado,ust:renderUst,dostep:renderDostep})[S.tab]();
   renderSelBar();
 }
 function openModal(html,o={}){
@@ -760,6 +833,76 @@ function openModal(html,o={}){
 }
 function closeModal(){S.mCharts.forEach(c=>c.destroy());S.mCharts=[];$('#modalRoot').innerHTML=''}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+
+/* ================== ZAKŁADKA: DOSTĘP (tylko twórca) ================== */
+const PW_W=["krowa","siano","obora","mleko","pasza","silos","traktor","zyto","owies","zima","lato","deszcz","kamien","rzeka","las","pole","mlyn","dab","lipa","sosna","orzech","jablko","gruszka","miod","chleb","ser","maslo","brama","plot","stajnia","kogut","kaczka","koza","owca","byk","cielak","klos","snop","grabie","widly","wiadro","dzwon","ogrod","most","droga","gorka","dolina","jezioro","wiatr","chmura","gwiazda","poranek","burza","kret","sowa","lis","zubr","bocian","wierzba","buk"];
+function genPw(){const r=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n};
+  return `${PW_W[r(PW_W.length)]}-${PW_W[r(PW_W.length)]}-${String(1000+r(9000))}`}
+const ROLE_N={admin:'twórca',user:'osoba',agent:'agent z obory'};
+async function makeAccount(pw){
+  // osobna instancja Firebase – twórca pozostaje zalogowany na swoim koncie
+  const app2=firebase.apps.find(a=>a.name==='konta')||firebase.initializeApp(firebaseConfig,'konta');
+  const a2=app2.auth();const cr=await a2.createUserWithEmailAndPassword(await pwEmail(pw),pw);const uid=cr.user.uid;await a2.signOut();return uid;
+}
+function pwShow(imie,pw,agent){
+  openModal(`<h2>Hasło dla: ${esc(imie)}</h2>
+    <p style="font-size:16px">Przekaż to hasło ${agent?'i wpisz je na komputerze w oborze w <b>USTAW_KONTO.bat</b>':'tej osobie (najlepiej osobiście albo SMS-em)'}.</p>
+    <p class="pwbig" id="pwBig">${esc(pw)}</p>
+    <p class="muted">Aplikacja nigdzie nie zapisuje haseł – po zamknięciu tego okna nie da się go odczytać. Zgubione hasło: „Nowe hasło”.</p>
+    <div class="row" style="margin-top:12px"><button class="btn" id="pwCopy" style="min-height:44px">Kopiuj</button><span class="spacer"></span><button class="btn pri" data-close style="min-height:44px">Gotowe</button></div>`);
+  $('#pwCopy').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(pw).then(()=>toast('Skopiowano hasło'))};
+}
+async function renderDostep(){
+  if(!isAdmin()){$('#main').innerHTML='';return}
+  $('#main').innerHTML='<div class="card muted">Wczytuję listę osób…</div>';
+  let L=[];
+  try{const qs=await db.collection('uzytkownicy').get();qs.forEach(d=>L.push({uid:d.id,...d.data()}))}
+  catch(e){$('#main').innerHTML=`<div class="card"><h2>Dostęp</h2><p>Nie udało się wczytać listy (${esc(e.code||e.message)}).</p></div>`;return}
+  if(S.tab!=='dostep')return;
+  const ord={admin:0,user:1,agent:2};L.sort((a,b)=>(ord[a.rola]??3)-(ord[b.rola]??3)||(a.imie||'').localeCompare(b.imie||'','pl'));
+  const card=u=>{const me=u.uid===ME.uid,ag=u.rola==='agent',adm=u.rola==='admin',on=u.aktywny===true;
+    return`<div class="ucard${on?'':' off'}" data-u="${esc(u.uid)}">
+      <div class="u-h"><span class="u-av">${ag?'🖥️':esc(((u.imie||'?')[0]||'?').toUpperCase())}</span><div class="u-n"><b>${esc(u.imie||'(bez nazwy)')}</b><span>${ROLE_N[u.rola]||u.rola}${me?' · to Ty':''}${on?'':' · <b class="bad">zablokowany</b>'}</span></div></div>
+      ${ag?'<p class="muted" style="margin:6px 0 0">Może tylko wysyłać dane z Infodexu. Nie widzi aplikacji.</p>':adm?'<p class="muted" style="margin:6px 0 0">Twórca widzi wszystkie zakładki i zarządza dostępem.</p>':`
+      <div class="u-tabs">${TABS.map(([k,n])=>`<label class="tchip"><input type="checkbox" data-tab="${k}"${(u.zakladki||[]).includes(k)?' checked':''}><span>${n}</span></label>`).join('')}</div>
+      <label class="tsw"><input type="checkbox" data-zapis${u.zapis?' checked':''}><span>Może zmieniać dane (przenosić krowy, wpisywać, wgrywać pliki)</span></label>`}
+      ${me?'':`<div class="u-acts"><button class="btn${on?' danger':' pri'}" data-act="lock">${on?'Zablokuj':'Odblokuj'}</button><button class="btn" data-act="pw">Nowe hasło</button><button class="btn danger" data-act="del">Usuń</button></div>`}
+    </div>`};
+  $('#main').innerHTML=`<div class="card"><h2 style="margin-top:0">Dostęp do aplikacji</h2>
+    <p class="muted">Każda osoba ma własne hasło. Zaznacz, które zakładki widzi. Zmiany działają od razu, także na telefonach, na których ktoś jest już zalogowany.</p></div>
+    <div class="ulist">${L.map(card).join('')}</div>
+    <div class="card"><h2 style="margin-top:0">Dodaj</h2>
+      <div class="grid2"><label class="f">Imię lub nazwa<input id="nuName" placeholder="np. Adam, Marek – dojarz"></label>
+      <label class="f">Kto to jest<select id="nuRole"><option value="user">Osoba (aplikacja)</option><option value="agent">Komputer w oborze (agent)</option><option value="admin">Drugi twórca (pełny dostęp)</option></select></label></div>
+      <div id="nuTabsBox"><p class="muted" style="margin:10px 0 4px">Zakładki:</p><div class="u-tabs">${TABS.map(([k,n])=>`<label class="tchip"><input type="checkbox" data-ntab="${k}"${k!=='ust'?' checked':''}><span>${n}</span></label>`).join('')}</div>
+      <label class="tsw"><input type="checkbox" id="nuZapis" checked><span>Może zmieniać dane</span></label></div>
+      <label class="f" style="margin-top:10px">Hasło<div class="row"><input id="nuPw" style="flex:1;min-width:0" value="${esc(genPw())}"><button class="btn" id="nuGen" type="button">Losuj inne</button></div></label>
+      <p class="muted">Hasło musi być inne dla każdej osoby (to po nim aplikacja rozpoznaje, kto wchodzi). Co najmniej 10 znaków.</p>
+      <button class="btn pri" id="nuAdd" style="min-height:48px;margin-top:6px">Utwórz dostęp</button></div>`;
+  const save=async(uid,f,msg)=>{try{await db.collection('uzytkownicy').doc(uid).set({...f,zmieniono:nowISO(),zmienil:ME.uid},{merge:true});if(msg)toast(msg)}catch(e){toast('Nie zapisano: '+(e.code||e.message),5000);renderDostep()}};
+  document.querySelectorAll('.ucard').forEach(c=>{const uid=c.dataset.u,u=L.find(x=>x.uid===uid);
+    c.querySelectorAll('[data-tab]').forEach(i=>i.onchange=()=>{const z=[...c.querySelectorAll('[data-tab]')].filter(x=>x.checked).map(x=>x.dataset.tab);save(uid,{zakladki:z},`${u.imie}: zapisano zakładki`)});
+    const zp=c.querySelector('[data-zapis]');if(zp)zp.onchange=()=>save(uid,{zapis:zp.checked},zp.checked?`${u.imie}: może zmieniać dane`:`${u.imie}: tylko podgląd`);
+    c.querySelectorAll('[data-act]').forEach(b=>b.onclick=async()=>{const a=b.dataset.act;
+      if(a==='lock'){const on=u.aktywny===true;if(on&&!confirm(`Zablokować: ${u.imie}? Straci dostęp od razu.`))return;await save(uid,{aktywny:!on},on?'Zablokowano':'Odblokowano');renderDostep()}
+      if(a==='del'){if(!confirm(`Usunąć: ${u.imie}? Jego hasło przestanie działać.`))return;try{await db.collection('uzytkownicy').doc(uid).delete();toast('Usunięto')}catch(e){toast('Nie usunięto: '+(e.code||e.message),5000)}renderDostep()}
+      if(a==='pw'){if(!confirm(`Nadać nowe hasło dla: ${u.imie}? Stare hasło przestanie działać.`))return;const pw=genPw();
+        try{const nu=await makeAccount(pw);const {uid:_,...rest}=u;await db.collection('uzytkownicy').doc(nu).set({...rest,utworzono:nowISO(),zmienil:ME.uid});await db.collection('uzytkownicy').doc(uid).delete();pwShow(u.imie,pw,u.rola==='agent');renderDostep()}
+        catch(e){toast(authErr(e),6000)}}
+    })});
+  const role=$('#nuRole');role.onchange=()=>$('#nuTabsBox').classList.toggle('hidden',role.value!=='user');
+  $('#nuGen').onclick=()=>{$('#nuPw').value=genPw()};
+  $('#nuAdd').onclick=async()=>{
+    const imie=$('#nuName').value.trim(),pw=$('#nuPw').value.trim(),r=role.value;
+    if(!imie)return toast('Wpisz imię lub nazwę.');if(pw.length<10)return toast('Hasło musi mieć co najmniej 10 znaków.');
+    const b=$('#nuAdd');b.disabled=true;b.textContent='Tworzę…';
+    try{const uid=await makeAccount(pw);
+      const doc={imie,rola:r,aktywny:true,utworzono:nowISO(),zmienil:ME.uid};
+      if(r==='user'){doc.zakladki=[...document.querySelectorAll('[data-ntab]')].filter(x=>x.checked).map(x=>x.dataset.ntab);doc.zapis=$('#nuZapis').checked}
+      await db.collection('uzytkownicy').doc(uid).set(doc);pwShow(imie,pw,r==='agent');renderDostep()}
+    catch(e){toast(authErr(e),6000);b.disabled=false;b.textContent='Utwórz dostęp'}
+  };
+}
 
 /* ================== ZAKŁADKA: GRUPY ================== */
 const activeCows=()=>Object.values(S.farm.cows).filter(c=>c.aktywna!==false);
@@ -1516,8 +1659,7 @@ function renderAnalysis(){
 function renderUst(){
   const s=S.farm.settings;
   const num=(k,label,step=1)=>`<label class="f">${label}<input type="number" step="${step}" data-s="${k}" value="${s[k]??''}"></label>`;
-  $('#main').innerHTML=`${ME?`<div class="card"><div class="row"><div><h2 style="margin:0">Konto</h2><div class="muted" style="font-size:15px">Zalogowano: <b>${esc(ME.email||'')}</b></div></div><span class="spacer"></span><button class="btn" id="btnOut" style="min-height:44px">Wyloguj</button></div>
-    <p class="muted" style="margin:8px 0 0">Wylogowanie usuwa dane gospodarstwa z tego urządzenia. W bazie nic nie znika.</p></div>`:''}
+  $('#main').innerHTML=`
   <div class="card"><h2>Reguły grup</h2><p class="muted">Na ich podstawie aplikacja podpowiada przesunięcia. Przesunięcie zawsze zatwierdzasz sam.</p>
     <div class="grid2">${num('dimG1G2','Grupa 1 → 2: od dnia laktacji')}${num('dimG1G2Pierw','Próg dla pierwiastek (puste = jak wyżej)')}
     ${num('dniZasuszenia','Zasuszenie: dni przed wycieleniem')}${num('ciaza','Długość ciąży (dni)')}</div>${ixPar('DryOffBeforeCalving')?`<p class="muted" style="margin-top:8px">W Infodexie: zasuszenie ${esc(ixPar('DryOffBeforeCalving'))} dni przed wycieleniem, ciąża ${esc(ixPar('CalvingAfterInsemination')||'–')} dni, siara ${esc(ixPar('Colstrum')||'–')} dni. Aplikacja liczy według wartości wpisanych powyżej.</p>`:''}</div>
@@ -1544,7 +1686,6 @@ function renderUst(){
     ${ixHas()?(()=>{const iss=ixL().issues;return iss.length?`<details style="margin-top:12px"><summary><b>Dopasowanie krów Infodex ↔ próbny dój: ${iss.length} uwag</b></summary><p class="muted">Krowy łączę po kolczyku, a gdy się nie zgadza, po numerze. Popraw kolczyki w Infodexie albo w SOL, żeby dane się nie myliły.</p><div class="hist">${iss.map(i=>`<div>${esc(i.msg)}</div>`).join('')}</div></details>`:'<p class="muted" style="margin-top:12px">Wszystkie krowy z Infodexu dopasowane do próbnego doju.</p>'})():''}</div>`;
   ixShowStatus();
   $('#ixFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)ixImport(f)};
-  {const bo=$('#btnOut');if(bo)bo.onclick=signOutAll}
   $('#saveSet').onclick=async()=>{
     const ns={...s};document.querySelectorAll('[data-s]').forEach(i=>{const v=i.value.trim();ns[i.dataset.s]=v===''?null:Number(v)});
     Object.keys(DEF_SETTINGS).filter(k=>k!=='dimG1G2Pierw').forEach(k=>{if(ns[k]===null||ns[k]===undefined||isNaN(ns[k]))ns[k]=DEF_SETTINGS[k]});

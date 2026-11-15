@@ -3,7 +3,7 @@ chcp 65001 >nul
 title GR Formela - konto agenta
 echo.
 echo  GR FORMELA - konto agenta (logowanie do bazy)
-echo  Wpisz e-mail i haslo konta agenta, ktore dostales od wlasciciela.
+echo  Wpisz haslo agenta z aplikacji (zakladka Dostep - Komputer w oborze).
 echo  Haslo zapisze sie zaszyfrowane - odczyta je tylko ten uzytkownik Windows.
 echo.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0gr_formela_sync.ps1" -SetAccount
@@ -19,8 +19,8 @@ pause
 exit /b 0
 :zle
 echo.
-echo  NIE UDALO SIE: zly e-mail albo haslo, albo konto nie jest dodane
-echo  w Firebase. Sprawdz dane i uruchom USTAW_KONTO.bat jeszcze raz.
+echo  NIE UDALO SIE: zle haslo albo agent zablokowany w zakladce Dostep.
+echo  Sprawdz haslo i uruchom USTAW_KONTO.bat jeszcze raz.
 pause
 exit /b 1
 :brak_netu

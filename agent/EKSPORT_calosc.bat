@@ -21,8 +21,8 @@ exit /b 0
 :brak_konta
 echo.
 echo  BRAK KONTA AGENTA albo zle haslo - baza nie przyjela danych.
-echo  Uruchom USTAW_KONTO.bat i wpisz e-mail oraz haslo konta agenta
-echo  (zalozone przez wlasciciela w Firebase). Szczegoly w gr_formela_sync.log.
+echo  Uruchom USTAW_KONTO.bat i wpisz haslo agenta z aplikacji
+echo  (zakladka Dostep). Szczegoly w gr_formela_sync.log.
 pause
 exit /b 1
 :brak_netu

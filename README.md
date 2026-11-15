@@ -30,30 +30,32 @@ w zakładce *Próbne doje*, potem przydziel krowy w zakładce *Grupy*.
 Po każdej zmianie `index.html` podbij `CACHE_NAME` w `sw.js` (grformela-v1 → grformela-v2),
 żeby telefony pobrały nową wersję.
 
-## Zamknięcie bazy – logowanie (krok po kroku)
-Od wersji 0.13.0 aplikacja wymaga logowania kontem Google, a agent z obory loguje się własnym kontem.
-Adresów e-mail i haseł **nie wpisujemy do kodu**. Wszystko ustawia się w konsoli Firebase (projekt `gr-formela-po-app`).
+## Logowanie i dostęp (krok po kroku)
+Każda osoba wchodzi **własnym hasłem** (bez e-maila). Hasło wskazuje konto i to, które zakładki widzi.
+Telefon pamięta zalogowanie – hasło wpisuje się raz. Dostępem zarządza twórca w zakładce **Dostęp**:
+dodaje osoby i agenta, zaznacza zakładki, daje albo zabiera prawo zapisu, blokuje i nadaje nowe hasła.
+Haseł nigdzie nie zapisujemy, ani w kodzie, ani w bazie.
 
-Kolejność jest ważna. Reguły bazy (krok 6) zmieniamy dopiero, gdy aplikacja z logowaniem i nowy agent już działają.
+Kolejność jest ważna. Reguły bazy (krok 6) zmieniamy dopiero, gdy aplikacja i nowy agent już działają.
 
-1. **Authentication → Metoda logowania**: włącz **Google** oraz **E-mail/hasło**.
-2. **Authentication → Ustawienia → Autoryzowane domeny**: dodaj adres, pod którym działa aplikacja
-   (teraz `piterds7-blip.github.io`; adresy `…web.app` i `…firebaseapp.com` są tam od początku).
-3. **Authentication → Użytkownicy → Dodaj użytkownika**: konto agenta (dowolny e-mail, np. `agent.obora@…`, i mocne hasło).
-   Skopiuj jego **UID**.
-4. **Firestore → Dane**:
-   - kolekcja `dostep`, dokument o **ID = adres e-mail Google** (małymi literami), np. pole `kto: "hodowca"` – po jednym dokumencie na każdą osobę,
-   - kolekcja `agenci`, dokument o **ID = UID konta agenta**, np. pole `kto: "obora"`.
-5. Na komputerze w oborze: skopiuj nowy folder `agent`, uruchom **USTAW_KONTO.bat** (e-mail i hasło konta agenta),
-   potem **EKSPORT_ostatnie_dni.bat** – powinno skończyć się napisem GOTOWE.
+1. Konsola Firebase → **Authentication → Metoda logowania**: włącz **E-mail/hasło**.
+2. **Authentication → Ustawienia → Autoryzowane domeny**: sprawdź, że jest `piterds7-blip.github.io`
+   (adresy `…web.app` i `…firebaseapp.com` są tam od początku).
+3. W aplikacji: rozwiń „Pierwsze uruchomienie (tylko twórca)”, wpisz własne długie hasło (min. 10 znaków) i kliknij
+   „Utwórz konto twórcy”. Aplikacja pokaże **kod konta**.
+4. **Firestore → Dane**: kolekcja `uzytkownicy`, dokument o **ID = kod konta**, pola:
+   `rola` = `admin`, `aktywny` = `true` (boolean), `imie` = Twoje imię. Aplikacja od razu pokaże zakładkę **Dostęp**.
+5. W zakładce **Dostęp** dodaj osoby i „Komputer w oborze (agent)”. Na komputerze w oborze uruchom
+   **USTAW_KONTO.bat** (wpisz hasło agenta), potem **EKSPORT_ostatnie_dni.bat** – powinno skończyć się napisem GOTOWE.
 6. **Firestore → Reguły**: wklej zawartość `firestore.rules` i kliknij **Opublikuj**.
-7. Sprawdź: telefon (zaloguj się), agent (EKSPORT_ostatnie_dni.bat). Konto Google spoza listy widzi ekran „Brak dostępu”.
 
-Wylogowanie (Ustawienia → Konto) usuwa kopię danych z urządzenia.
+Co sprawdza baza: brak konta lub blokada = brak dostępu; „Może zmieniać dane” = zapis, bez tego tylko podgląd;
+agent może tylko wysyłać dane z Infodexu. Zakładki ukrywa aplikacja (osoba z dostępem do odczytu technicznie
+może odczytać wszystkie dane gospodarstwa, nie tylko te z widocznych zakładek).
 
 ## Agent z obory (`agent/`)
 - `ZAINSTALUJ.bat` – pierwsza instalacja: konto agenta, pierwsza wysyłka, harmonogram 06:00 i 17:00.
-- `USTAW_KONTO.bat` – zmiana e-maila/hasła agenta. Hasło zapisuje się zaszyfrowane przez Windows w `%USERPROFILE%\GRFormela`.
+- `USTAW_KONTO.bat` – hasło agenta (z zakładki Dostęp). Zapisuje się zaszyfrowane przez Windows w `%USERPROFILE%\GRFormela`.
 - `EKSPORT_ostatnie_dni.bat`, `EKSPORT_calosc.bat` – wysyłka ręczna; `EKSPORT_do_pliku.bat` – awaryjnie plik na pendrive.
 - Pliki z danymi (`*.json`, log, stan, konto) nie trafiają do repozytorium (`.gitignore`).
 
