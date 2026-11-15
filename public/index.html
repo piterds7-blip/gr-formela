@@ -717,7 +717,7 @@ function authScreen(err=''){
     <p>Wpisz swoje hasło.</p>
     <form id="pwForm" autocomplete="on">
       <input type="text" name="username" value="GR Formela" autocomplete="username" hidden>
-      <div class="pwrow"><input id="pwIn" class="pwin" type="password" name="password" autocomplete="current-password" placeholder="Hasło" required>
+      <div class="pwrow"><input id="pwIn" class="pwin" type="password" name="password" autocomplete="current-password" placeholder="Hasło" required autocapitalize="off" autocorrect="off" spellcheck="false">
       <button type="button" class="pweye" id="pwEye" aria-label="Pokaż hasło">👁</button></div>
       <button class="gbtn pri" type="submit" id="pwGo"><span>Wejdź</span></button>
     </form>
@@ -761,8 +761,8 @@ function userChip(){
   $('#userBox').innerHTML=`<button class="ubtn" id="ubtn" title="Konto: ${esc(n)}">${esc((n[0]||'?').toUpperCase())}</button>`;
   $('#ubtn').onclick=()=>{openModal(`<h2>Konto</h2><p style="font-size:16px">Zalogowano: <b>${esc(n)}</b>${isAdmin()?' (twórca)':''}</p>
     <p class="muted">Wylogowanie usuwa dane gospodarstwa z tego urządzenia. Do ponownego wejścia potrzebne jest hasło.</p>
-    <div class="row" style="margin-top:12px"><button class="btn danger" id="mOut" style="min-height:44px">Wyloguj</button><span class="spacer"></span><button class="btn" data-close style="min-height:44px">Zamknij</button></div>`);
-    $('#mOut').onclick=signOutAll};
+    <div class="row" style="margin-top:12px"><button class="btn danger" id="mOut" style="min-height:44px">Wyloguj</button>${isAdmin()?'<button class="btn" id="mPw" style="min-height:44px">Zmień hasło</button>':''}<span class="spacer"></span><button class="btn" data-close style="min-height:44px">Zamknij</button></div>`);
+    $('#mOut').onclick=signOutAll;const mp=$('#mPw');if(mp)mp.onclick=changeMyPassword};
 }
 function lockScreen(title,html){
   $('#tabs').classList.add('hidden');
@@ -802,7 +802,7 @@ async function boot(){
     ME=u;BOOTED=true;
     // uprawnienia na żywo: zablokowanie albo zmiana zakładek działa od razu, bez ponownego logowania
     PROF_UNSUB=db.collection('uzytkownicy').doc(u.uid).onSnapshot(s=>onProfile(s.exists?s.data():null),
-      e=>{console.error(e);lockScreen('Brak dostępu',`<p>Nie udało się sprawdzić uprawnień (${esc(e.code||e.message)}).</p>`)});
+      e=>{console.error(e);lockScreen('Brak dostępu',e.code==='permission-denied'?`<p>Baza nie wpuszcza tego konta.</p><p class="muted">Najczęstsza przyczyna przy pierwszym uruchomieniu: nowe reguły bazy nie są jeszcze opublikowane. Twórca: Firebase → Firestore → Reguły → wklej plik firestore.rules → Opublikuj, potem odśwież aplikację.</p>`:`<p>Nie udało się sprawdzić uprawnień (${esc(e.code||e.message)}).</p>`)});
   });
 }
 async function afterLogin(){
@@ -831,7 +831,7 @@ function openModal(html,o={}){
   const bg=$('#modalRoot .modal-bg');
   bg.onclick=e=>{if(e.target===bg||e.target.closest('[data-close]'))closeModal()};
 }
-function closeModal(){S.mCharts.forEach(c=>c.destroy());S.mCharts=[];$('#modalRoot').innerHTML=''}
+function closeModal(){if(S.lockModal)return;S.mCharts.forEach(c=>c.destroy());S.mCharts=[];$('#modalRoot').innerHTML=''}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 
 /* ================== ZAKŁADKA: DOSTĘP (tylko twórca) ================== */
@@ -839,10 +839,49 @@ const PW_W=["krowa","siano","obora","mleko","pasza","silos","traktor","zyto","ow
 function genPw(){const r=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n};
   return `${PW_W[r(PW_W.length)]}-${PW_W[r(PW_W.length)]}-${String(1000+r(9000))}`}
 const ROLE_N={admin:'twórca',user:'osoba',agent:'agent z obory'};
-async function makeAccount(pw){
+async function makeAccount(pw,keep){
   // osobna instancja Firebase – twórca pozostaje zalogowany na swoim koncie
   const app2=firebase.apps.find(a=>a.name==='konta')||firebase.initializeApp(firebaseConfig,'konta');
-  const a2=app2.auth();const cr=await a2.createUserWithEmailAndPassword(await pwEmail(pw),pw);const uid=cr.user.uid;await a2.signOut();return uid;
+  const a2=app2.auth();const cr=await a2.createUserWithEmailAndPassword(await pwEmail(pw),pw);const uid=cr.user.uid;if(!keep)await a2.signOut();return uid;
+}
+/* Zmiana własnego hasła twórcy. Hasło wyznacza konto, więc powstaje nowe konto z kopią uprawnień,
+   a stare znika: nowe konto (zalogowane w osobnej instancji) usuwa dokument starego. Przy błędzie nic się nie zmienia. */
+function changeMyPassword(){
+  if(!isAdmin())return;
+  openModal(`<h2>Zmiana mojego hasła</h2>
+    <label class="f">Obecne hasło<input id="cpOld" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+    <label class="f" style="margin-top:10px">Nowe hasło (co najmniej 10 znaków)<div class="row"><input id="cpNew" style="flex:1;min-width:0" value="${esc(genPw())}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="btn" id="cpGen" type="button">Losuj inne</button></div></label>
+    <p class="muted">Po zmianie zostaniesz wylogowany i wejdziesz nowym hasłem. Stare hasło przestanie działać.</p>
+    <div class="row" style="margin-top:12px"><button class="btn pri" id="cpGo" style="min-height:48px">Zmień hasło</button><span class="spacer"></span><button class="btn" data-close style="min-height:44px">Anuluj</button></div>`);
+  $('#cpGen').onclick=()=>{$('#cpNew').value=genPw()};
+  $('#cpGo').onclick=async()=>{
+    const cur=$('#cpOld').value.trim(),np=$('#cpNew').value.trim();
+    if(!cur)return toast('Wpisz obecne hasło.');
+    if(np.length<10)return toast('Nowe hasło musi mieć co najmniej 10 znaków.');
+    if(np===cur)return toast('Nowe hasło musi być inne niż obecne.');
+    const b=$('#cpGo');b.disabled=true;b.textContent='Zmieniam…';
+    const fail=m=>{toast(m,6000);b.disabled=false;b.textContent='Zmień hasło'};
+    try{await AUTH.currentUser.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(await pwEmail(cur),cur))}
+    catch(e){return fail(e.code==='auth/too-many-requests'?authErr(e):'Obecne hasło jest nieprawidłowe.')}
+    const oldUid=ME.uid;let newUid;
+    try{
+      newUid=await makeAccount(np,true);
+      await db.collection('uzytkownicy').doc(newUid).set({...PROF,utworzono:nowISO(),zmieniono:nowISO(),zmienil:oldUid});
+    }catch(e){
+      // nic nie zostaje po nieudanej próbie: usuwam świeżo założone konto, żeby to samo hasło można było spróbować ponownie
+      try{const cu=firebase.app('konta').auth().currentUser;if(cu)await cu.delete()}catch(_){}
+      return fail(authErr(e));
+    }
+    let removed=true;
+    if(PROF_UNSUB){PROF_UNSUB();PROF_UNSUB=null}
+    try{await firebase.app('konta').firestore().collection('uzytkownicy').doc(oldUid).delete()}catch(e){console.warn(e);removed=false}
+    try{await firebase.app('konta').auth().signOut()}catch(_){}
+    S.lockModal=true;   // okno z nowym hasłem zamyka się tylko przyciskiem – hasła nie da się potem odczytać
+    openModal(`<h2>Hasło zmienione</h2><p style="font-size:16px">Twoje nowe hasło:</p><p class="pwbig">${esc(np)}</p>
+      <p class="muted">Zapisz je teraz (najlepiej w menedżerze haseł). Po kliknięciu zostaniesz wylogowany i wejdziesz nowym hasłem.${removed?'':' <b>Uwaga:</b> stare konto nie zostało usunięte – po zalogowaniu usuń je w zakładce Dostęp (druga karta z Twoim imieniem, przycisk „Usuń”).'}</p>
+      <div class="row" style="margin-top:12px"><span class="spacer"></span><button class="btn pri" id="cpOut" style="min-height:48px">Zaloguj się nowym hasłem</button></div>`);
+    $('#cpOut').onclick=async()=>{try{await AUTH.currentUser.delete()}catch(e){try{await AUTH.signOut()}catch(_){}}location.reload()};
+  };
 }
 function pwShow(imie,pw,agent){
   openModal(`<h2>Hasło dla: ${esc(imie)}</h2>
@@ -866,7 +905,7 @@ async function renderDostep(){
       ${ag?'<p class="muted" style="margin:6px 0 0">Może tylko wysyłać dane z Infodexu. Nie widzi aplikacji.</p>':adm?'<p class="muted" style="margin:6px 0 0">Twórca widzi wszystkie zakładki i zarządza dostępem.</p>':`
       <div class="u-tabs">${TABS.map(([k,n])=>`<label class="tchip"><input type="checkbox" data-tab="${k}"${(u.zakladki||[]).includes(k)?' checked':''}><span>${n}</span></label>`).join('')}</div>
       <label class="tsw"><input type="checkbox" data-zapis${u.zapis?' checked':''}><span>Może zmieniać dane (przenosić krowy, wpisywać, wgrywać pliki)</span></label>`}
-      ${me?'':`<div class="u-acts"><button class="btn${on?' danger':' pri'}" data-act="lock">${on?'Zablokuj':'Odblokuj'}</button><button class="btn" data-act="pw">Nowe hasło</button><button class="btn danger" data-act="del">Usuń</button></div>`}
+      ${me?(adm?'<div class="u-acts"><button class="btn" data-act="mypw">Zmień moje hasło</button></div>':''):`<div class="u-acts"><button class="btn${on?' danger':' pri'}" data-act="lock">${on?'Zablokuj':'Odblokuj'}</button><button class="btn" data-act="pw">Nowe hasło</button><button class="btn danger" data-act="del">Usuń</button></div>`}
     </div>`};
   $('#main').innerHTML=`<div class="card"><h2 style="margin-top:0">Dostęp do aplikacji</h2>
     <p class="muted">Każda osoba ma własne hasło. Zaznacz, które zakładki widzi. Zmiany działają od razu, także na telefonach, na których ktoś jest już zalogowany.</p></div>
@@ -876,7 +915,7 @@ async function renderDostep(){
       <label class="f">Kto to jest<select id="nuRole"><option value="user">Osoba (aplikacja)</option><option value="agent">Komputer w oborze (agent)</option><option value="admin">Drugi twórca (pełny dostęp)</option></select></label></div>
       <div id="nuTabsBox"><p class="muted" style="margin:10px 0 4px">Zakładki:</p><div class="u-tabs">${TABS.map(([k,n])=>`<label class="tchip"><input type="checkbox" data-ntab="${k}"${k!=='ust'?' checked':''}><span>${n}</span></label>`).join('')}</div>
       <label class="tsw"><input type="checkbox" id="nuZapis" checked><span>Może zmieniać dane</span></label></div>
-      <label class="f" style="margin-top:10px">Hasło<div class="row"><input id="nuPw" style="flex:1;min-width:0" value="${esc(genPw())}"><button class="btn" id="nuGen" type="button">Losuj inne</button></div></label>
+      <label class="f" style="margin-top:10px">Hasło<div class="row"><input id="nuPw" style="flex:1;min-width:0" value="${esc(genPw())}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="btn" id="nuGen" type="button">Losuj inne</button></div></label>
       <p class="muted">Hasło musi być inne dla każdej osoby (to po nim aplikacja rozpoznaje, kto wchodzi). Co najmniej 10 znaków.</p>
       <button class="btn pri" id="nuAdd" style="min-height:48px;margin-top:6px">Utwórz dostęp</button></div>`;
   const save=async(uid,f,msg)=>{try{await db.collection('uzytkownicy').doc(uid).set({...f,zmieniono:nowISO(),zmienil:ME.uid},{merge:true});if(msg)toast(msg)}catch(e){toast('Nie zapisano: '+(e.code||e.message),5000);renderDostep()}};
@@ -884,6 +923,7 @@ async function renderDostep(){
     c.querySelectorAll('[data-tab]').forEach(i=>i.onchange=()=>{const z=[...c.querySelectorAll('[data-tab]')].filter(x=>x.checked).map(x=>x.dataset.tab);save(uid,{zakladki:z},`${u.imie}: zapisano zakładki`)});
     const zp=c.querySelector('[data-zapis]');if(zp)zp.onchange=()=>save(uid,{zapis:zp.checked},zp.checked?`${u.imie}: może zmieniać dane`:`${u.imie}: tylko podgląd`);
     c.querySelectorAll('[data-act]').forEach(b=>b.onclick=async()=>{const a=b.dataset.act;
+      if(a==='mypw'){changeMyPassword();return}
       if(a==='lock'){const on=u.aktywny===true;if(on&&!confirm(`Zablokować: ${u.imie}? Straci dostęp od razu.`))return;await save(uid,{aktywny:!on},on?'Zablokowano':'Odblokowano');renderDostep()}
       if(a==='del'){if(!confirm(`Usunąć: ${u.imie}? Jego hasło przestanie działać.`))return;try{await db.collection('uzytkownicy').doc(uid).delete();toast('Usunięto')}catch(e){toast('Nie usunięto: '+(e.code||e.message),5000)}renderDostep()}
       if(a==='pw'){if(!confirm(`Nadać nowe hasło dla: ${u.imie}? Stare hasło przestanie działać.`))return;const pw=genPw();

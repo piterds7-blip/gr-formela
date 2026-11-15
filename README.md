@@ -36,18 +36,23 @@ Telefon pamięta zalogowanie – hasło wpisuje się raz. Dostępem zarządza tw
 dodaje osoby i agenta, zaznacza zakładki, daje albo zabiera prawo zapisu, blokuje i nadaje nowe hasła.
 Haseł nigdzie nie zapisujemy, ani w kodzie, ani w bazie.
 
-Kolejność jest ważna. Reguły bazy (krok 6) zmieniamy dopiero, gdy aplikacja i nowy agent już działają.
+Kolejność jest ważna. Aplikacja bez opublikowanych reguł nie pokaże kodu konta (zobaczysz „Brak dostępu”).
 
 1. Konsola Firebase → **Authentication → Metoda logowania**: włącz **E-mail/hasło**.
 2. **Authentication → Ustawienia → Autoryzowane domeny**: sprawdź, że jest `piterds7-blip.github.io`
    (adresy `…web.app` i `…firebaseapp.com` są tam od początku).
-3. W aplikacji: rozwiń „Pierwsze uruchomienie (tylko twórca)”, wpisz własne długie hasło (min. 10 znaków) i kliknij
-   „Utwórz konto twórcy”. Aplikacja pokaże **kod konta**.
-4. **Firestore → Dane**: kolekcja `uzytkownicy`, dokument o **ID = kod konta**, pola:
+3. **Firestore → Reguły**: wklej zawartość `firestore.rules` i kliknij **Opublikuj**.
+   Od tej chwili stary agent z obory nie wyśle danych (baza jest zamknięta). Dane zostają w Infodexie,
+   a nowy agent dośle ostatnie 10 dni (przy dłuższej przerwie uruchom `EKSPORT_calosc.bat`).
+4. W aplikacji: rozwiń „Pierwsze uruchomienie (tylko twórca)”, wpisz własne hasło (min. 10 znaków) i kliknij
+   „Utwórz konto twórcy”. Aplikacja pokaże **kod konta** (skopiuj go, nie przepisuj).
+5. **Firestore → Dane**: kolekcja `uzytkownicy` **na samym szczycie** (nie w `farms`), dokument o **ID = kod konta**, pola:
    `rola` = `admin`, `aktywny` = `true` (boolean), `imie` = Twoje imię. Aplikacja od razu pokaże zakładkę **Dostęp**.
-5. W zakładce **Dostęp** dodaj osoby i „Komputer w oborze (agent)”. Na komputerze w oborze uruchom
-   **USTAW_KONTO.bat** (wpisz hasło agenta), potem **EKSPORT_ostatnie_dni.bat** – powinno skończyć się napisem GOTOWE.
-6. **Firestore → Reguły**: wklej zawartość `firestore.rules` i kliknij **Opublikuj**.
+6. W zakładce **Dostęp** dodaj osoby i „Komputer w oborze (agent)”. Konta zakładaj tylko tu, nie w konsoli Firebase.
+7. Na komputerze w oborze uruchom **USTAW_KONTO.bat** (hasło agenta), potem **EKSPORT_ostatnie_dni.bat** – ma skończyć się napisem GOTOWE.
+
+Hasła innym osobom zmienia twórca (Dostęp → „Nowe hasło”). Własne hasło twórca zmienia przyciskiem
+„Zmień moje hasło” (Dostęp albo literka w nagłówku). Na telefonie przy wpisywaniu użyj ikony oka 👁, żeby zobaczyć wpisany tekst.
 
 Co sprawdza baza: brak konta lub blokada = brak dostępu; „Może zmieniać dane” = zapis, bez tego tylko podgląd;
 agent może tylko wysyłać dane z Infodexu. Zakładki ukrywa aplikacja (osoba z dostępem do odczytu technicznie
